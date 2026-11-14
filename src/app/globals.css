@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f5f1e8;
+  --sheet: #fbf9f4;
+  --ink: #18221d;
+  --ink-2: #4f5a53;
+  --ink-3: #7d857f;
+  --line: #d9d2c2;
+  --line-2: #e8e2d4;
+  --emerald: #0d4a37;
+  --emerald-2: #2c7a5c;
+  --emerald-tint: #e2ece5;
+  --brass: #a46d2b;
+  --brass-tint: #f2e6d2;
+  --alert: #9b3a22;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-emerald: var(--emerald);
+  --color-emerald-2: var(--emerald-2);
+  --color-emerald-tint: var(--emerald-tint);
+  --color-brass: var(--brass);
+  --color-brass-tint: var(--brass-tint);
+  --color-alert: var(--alert);
+  --font-display: var(--font-serif);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-plex-mono);
+}
+
+html {
+  background: var(--paper);
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+@layer components {
+/* angka rupiah selalu rata kolom */
+.num {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.display {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.eyebrow {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* aturan tipis sebagai struktur */
+.rule {
+  border-top: 1px solid var(--line);
+}
+.rule-double {
+  border-top: 3px double var(--line);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--ink);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--ink);
+  color: var(--sheet);
+}
+.btn-primary {
+  background: var(--emerald);
+  border-color: var(--emerald);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #093827;
+  color: #fff;
+}
+.btn-ghost {
+  border-color: transparent;
+  padding: 0 0.5rem;
+  color: var(--ink-2);
+}
+.btn-ghost:hover {
+  background: var(--line-2);
+  color: var(--ink);
+}
+.btn-danger {
+  border-color: var(--alert);
+  color: var(--alert);
+}
+.btn-danger:hover {
+  background: var(--alert);
+  color: #fff;
+}
+.btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px; /* cegah zoom iOS */
+}
+textarea.input {
+  height: auto;
+  min-height: 5rem;
+  padding: 0.6rem 0.75rem;
+}
+.input:focus {
+  outline: 2px solid var(--emerald-2);
+  outline-offset: -1px;
+  border-color: var(--emerald-2);
+}
+.input[aria-invalid="true"] {
+  border-color: var(--alert);
+}
+
+:focus-visible {
+  outline: 2px solid var(--emerald-2);
+  outline-offset: 2px;
+}
+
+/* checkbox gaya tinta */
+.check {
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1.5px solid var(--ink-2);
+  border-radius: 2px;
+  background: #fff;
+  display: inline-grid;
+  place-content: center;
+  flex: none;
+  cursor: pointer;
+}
+.check:checked {
+  background: var(--emerald);
+  border-color: var(--emerald);
+}
+.check:checked::after {
+  content: "";
+  width: 0.65rem;
+  height: 0.35rem;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: translateY(-1px) rotate(-45deg);
+}
+.check:disabled {
+  opacity: 0.5;
+}
+
+/* dialog sebagai lembar bawah di HP, panel di desktop */
+dialog.sheet {
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 92dvh;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 0;
+  background: var(--sheet);
+  color: var(--ink);
+}
+dialog.sheet::backdrop {
+  background: rgb(24 34 29 / 0.35);
+}
+@media (min-width: 768px) {
+  dialog.sheet {
+    margin: auto;
+    max-width: 36rem;
+    border: 1px solid var(--line);
+  }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: transparent;
+  white-space: nowrap;
+}
+.chip[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--sheet);
+}
+
+.tag {
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.link {
+  color: var(--emerald);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+}
