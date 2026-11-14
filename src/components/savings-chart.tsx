@@ -89,7 +89,7 @@ export function SavingsChart({ titik, target, today, nikah }: Props) {
             return (
             <g key={m.pct}>
               <line x1={pad.l} x2={w - pad.r} y1={Y(m.v)} y2={Y(m.v)} stroke={m.at && !turun ? "var(--emerald-2)" : "var(--line)"} strokeDasharray={m.at ? "1 3" : "2 5"} opacity={m.at && !turun ? 0.7 : 1} />
-              <text x={pad.l + 2} y={Y(m.v) - 5} fontSize="10.5" fill={m.at && !turun ? "var(--emerald)" : "var(--ink-3)"} className="num" paintOrder="stroke" stroke="var(--paper)" strokeWidth="3">
+              <text x={pad.l + 2} y={Y(m.v) - 5} fontSize="10.5" fill={m.at && !turun ? "var(--emerald)" : "var(--ink-3)"} className="num">
                 {m.pct}%
               </text>
               {m.at && <circle cx={X(t(m.at))} cy={Y(m.v)} r="3" fill={turun ? "var(--sheet)" : "var(--emerald)"} stroke={turun ? "var(--emerald-2)" : "var(--sheet)"} strokeWidth="1.5" />}

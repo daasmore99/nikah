@@ -15,8 +15,8 @@
   --ink: #18221d;
   --ink-2: #4f5a53;
   --ink-3: #7d857f;
-  --line: #d9d2c2;
-  --line-2: #e8e2d4;
+  --line: #c4baa2;
+  --line-2: #d5ccb6;
   --emerald: #0d4a37;
   --emerald-2: #2c7a5c;
   --emerald-tint: #e2ece5;
@@ -439,9 +439,7 @@ dialog.sheet::backdrop {
 }
 /* judul seksi: pita nada pudar di kiri supaya judul punya alas */
 .sec-head {
-  background: linear-gradient(90deg, var(--panel), transparent 85%);
-  padding: 0.5rem 0.6rem 0.5rem;
-  margin-inline: -0.6rem;
+  padding: 0.5rem 0;
 }
 
 /* menu "Lainnya" di HP */
