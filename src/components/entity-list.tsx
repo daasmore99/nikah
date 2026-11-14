@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useId, useMemo, useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { FIELDS, type Field } from "@/lib/fields";
-import { angka, rp, tgl } from "@/lib/format";
+import { angka, rp, rpSingkat, tgl } from "@/lib/format";
 import type { TableName } from "@/lib/types";
 import { createRow, deleteRow, updateRow } from "@/app/actions";
 import { FormSheet } from "./form-sheet";
 import { downloadCsv } from "./csv";
+import { MiniBar } from "./ui";
 
 type R = Record<string, unknown> & { id: string };
 
@@ -25,9 +26,16 @@ export interface ListConfig {
   link?: string;
   groupBy?: string;
   subGroupBy?: string;
-  filter?: { key: string; label?: string; options: string[] };
+  /** nullAs: baris dengan nilai kosong dihitung sebagai opsi ini; labels: teks chip */
+  filter?: { key: string; label?: string; options: string[]; nullAs?: string; labels?: Record<string, string> };
+  /** grup bisa dilipat. money: ringkasan dibayar/estimasi; progress: jumlah yang dicentang */
+  collapse?: "money" | "progress";
+  /** nilai badge yang tidak perlu ditampilkan (mis. BELUM BAYAR) */
+  quietBadge?: string[];
   search?: boolean;
   defaults?: Record<string, unknown>;
+  /** pilihan datalist tambahan per kolom, mis. nama tahap yang sudah ada */
+  fieldOptions?: Record<string, string[]>;
   hide?: string[];
   csv: string;
   empty: string;
@@ -39,8 +47,8 @@ export interface ListConfig {
 
 const BADGE: Record<string, string> = {
   LUNAS: "text-emerald",
-  "SUDAH DP": "text-brass",
-  "BELUM LUNAS": "text-alert",
+  "SUDAH DP": "text-brass-ink",
+  "BELUM LUNAS": "text-clay",
   "BELUM BAYAR": "text-ink-3",
   Dipilih: "text-emerald",
   Hadir: "text-emerald",
@@ -63,7 +71,9 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
   const c = config;
   const fields = FIELDS[c.table];
   const byKey = useMemo(() => Object.fromEntries(fields.map((f) => [f.key, f])), [fields]);
-  const formFields = fields.filter((f) => !c.hide?.includes(f.key));
+  const formFields = fields
+    .filter((f) => !c.hide?.includes(f.key))
+    .map((f) => (c.fieldOptions?.[f.key] ? { ...f, options: c.fieldOptions[f.key] } : f));
 
   const [optimistic, patch] = useOptimistic(rows, (state: R[], p: { id: string; key: string; value: unknown }) =>
     state.map((r) => (r.id === p.id ? { ...r, [p.key]: p.value } : r)),
@@ -73,9 +83,14 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
   const [filter, setFilter] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const uid = useId();
 
+  const filterVal = (r: R) => {
+    const v = r[c.filter!.key];
+    return v === null || v === undefined || v === "" ? c.filter!.nullAs ?? "" : String(v);
+  };
   const visible = optimistic.filter((r) => {
-    if (filter && c.filter && String(r[c.filter.key] ?? "") !== filter) return false;
+    if (filter && c.filter && filterVal(r) !== filter) return false;
     if (q) {
       const hay = [c.primary, ...(c.secondary ?? [])].map((k) => String(r[k] ?? "")).join(" ").toLowerCase();
       if (!hay.includes(q.toLowerCase())) return false;
@@ -96,6 +111,22 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
     }
     return out;
   }, [visible, c.groupBy, c.subGroupBy]);
+
+  const groupOf = (r: R) => (c.groupBy ? String(r[c.groupBy] ?? "Lainnya") : "");
+  // lipat: default semua tertutup; mode progres membuka tahap pertama yang belum beres
+  const [open, setOpen] = useState<Set<string>>(() => {
+    if (c.collapse !== "progress" || !c.toggle) return new Set();
+    const first = rows.find((r) => !r[c.toggle!]);
+    return new Set(first ? [groupOf(first)] : []);
+  });
+  const forcedOpen = Boolean(filter || q);
+  const flip = (name: string) =>
+    setOpen((s) => {
+      const n = new Set(s);
+      if (n.has(name)) n.delete(name);
+      else n.add(name);
+      return n;
+    });
 
   const toggle = (r: R, key: string, value: boolean) =>
     start(async () => {
@@ -124,32 +155,35 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
       .filter(Boolean)
       .join(" · ");
     const link = c.link ? (r[c.link] as string | null) : null;
-    const badge = c.badge ? (r[c.badge] as string | null) : null;
+    const rawBadge = c.badge ? (r[c.badge] as string | null) : null;
+    const badge = rawBadge && !c.quietBadge?.includes(rawBadge) ? rawBadge : null;
     return (
-      <li key={r.id} className="group flex items-start gap-3 border-b border-line-2 py-3 last:border-b-0">
+      <li key={r.id} className="flex items-start gap-1 border-b border-line-2 py-0.5 last:border-b-0">
         {c.toggle && (
-          <input type="checkbox" className="check mt-0.5" checked={done} aria-label={`Tandai ${String(r[c.primary] ?? "")}`}
-            onChange={(e) => toggle(r, c.toggle!, e.target.checked)} />
+          <label className="-ml-3 grid size-11 flex-none cursor-pointer place-items-center">
+            <input type="checkbox" className="check" checked={done} aria-label={`Tandai ${String(r[c.primary] ?? "")}`}
+              onChange={(e) => toggle(r, c.toggle!, e.target.checked)} />
+          </label>
         )}
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(r)}>
-          <span className={`block leading-snug ${done && c.strikeDone ? "text-ink-3 line-through decoration-ink-3/60" : ""}`}>
+        <button type="button" className={`row-btn min-w-0 flex-1 py-2.5 text-left ${c.toggle ? "pr-1" : "-ml-1.5 px-1.5"}`} onClick={() => setEditing(r)}>
+          <span className={`block leading-snug transition-colors duration-300 ${done && c.strikeDone ? "text-ink-3 line-through decoration-ink-3/60" : ""}`}>
             {fmt(byKey[c.primary], r[c.primary]) ||
               (c.primaryFallback && fmt(byKey[c.primaryFallback], r[c.primaryFallback])) || <em className="text-ink-3">belum diisi</em>}
           </span>
           {(sec || badge) && (
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-3">
-              {badge && <span className={`tag ${BADGE[badge] ?? "text-ink-2"}`}>{badge}</span>}
+            <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-ink-3">
+              {badge && <span className={`status ${BADGE[badge] ?? "text-ink-2"}`}>{badge}</span>}
               {sec && <span>{sec}</span>}
             </span>
           )}
         </button>
         {c.toggles && (
-          <span className="flex gap-3 pt-0.5">
+          <span className="flex gap-1 pt-0.5">
             {c.toggles.map((t) =>
               r[t.key] === null ? (
-                <span key={t.key} className="w-9 text-center text-[11px] text-ink-3" title="Tidak berlaku">—</span>
+                <span key={t.key} className="w-11 pt-3 text-center text-[11px] text-ink-3" title="Tidak berlaku">—</span>
               ) : (
-                <label key={t.key} className="flex w-9 flex-col items-center gap-1 text-[10px] text-ink-3">
+                <label key={t.key} className="flex min-h-11 w-11 cursor-pointer flex-col items-center justify-center gap-1 text-[10px] text-ink-3">
                   <input type="checkbox" className="check" checked={Boolean(r[t.key])} aria-label={`${t.label} ${String(r[c.primary])}`}
                     onChange={(e) => toggle(r, t.key, e.target.checked)} />
                   {t.label}
@@ -171,8 +205,13 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
           );
         })()}
         {(c.amount || link) && (
-          <span className="flex flex-none flex-col items-end gap-0.5 pt-0.5 text-right">
-            {c.amount && <span className="num text-[14px]">{r[c.amount] != null ? (byKey[c.amount]?.type === "int" ? angka(Number(r[c.amount])) : rp(Number(r[c.amount]))) : <span className="text-ink-3">—</span>}</span>}
+          <span className="flex flex-none flex-col items-end gap-0.5 pt-3 text-right">
+            {c.amount && r[c.amount] != null && (
+              <span className="num text-[14px]">{byKey[c.amount]?.type === "int" ? angka(Number(r[c.amount])) : rp(Number(r[c.amount]))}</span>
+            )}
+            {c.amount && r[c.amount] == null && !(c.amountNote && r[c.amountNote.key] != null) && !c.collapse && (
+              <span className="num text-[14px] text-ink-3">—</span>
+            )}
             {c.amountNote && r[c.amountNote.key] != null && (
               <span className="num text-[11.5px] text-ink-3">{c.amountNote.label} {rp(Number(r[c.amountNote.key]))}</span>
             )}
@@ -197,11 +236,11 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
         </button>
       </div>
       {c.filter && (
-        <div className="no-scrollbar -mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="no-scrollbar -mx-4 mb-2 flex gap-2 overflow-x-auto px-4 py-1.5">
           <button type="button" className="chip" aria-pressed={filter === null} onClick={() => setFilter(null)}>Semua</button>
           {c.filter.options.map((o) => (
             <button key={o} type="button" className="chip" aria-pressed={filter === o} onClick={() => setFilter(filter === o ? null : o)}>
-              {o} <span className="num ml-1.5 text-[11px] opacity-70">{optimistic.filter((r) => r[c.filter!.key] === o).length}</span>
+              {c.filter!.labels?.[o] ?? o} <span className="num ml-1.5 text-[11px] opacity-70">{optimistic.filter((r) => filterVal(r) === o).length}</span>
             </button>
           ))}
         </div>
@@ -209,6 +248,68 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
 
       {visible.length === 0 ? (
         <p className="border-y border-line py-8 text-center text-ink-3">{rows.length === 0 ? c.empty : "Tidak ada yang cocok dengan filter ini."}</p>
+      ) : c.collapse ? (
+        <div className="border-t border-ink">
+          {groups.map((G) => {
+            const all = optimistic.filter((r) => groupOf(r) === G.name);
+            const isOpen = forcedOpen || open.has(G.name);
+            const panel = `${uid}-${G.name.replace(/\W+/g, "-")}`;
+            let summary: ReactNode;
+            let bar: ReactNode;
+            if (c.collapse === "money" && c.amount) {
+              const paid = sum(all, c.amount);
+              const est = c.amountNote ? sum(all, c.amountNote.key) : 0;
+              summary = paid === 0 && est === 0 ? (
+                <span className="text-[12.5px] text-ink-3">belum ada angka</span>
+              ) : (
+                <span className="num text-[12.5px] text-ink-2">
+                  {rpSingkat(paid)}{est > 0 && <span className="text-ink-3"> / {rpSingkat(est)}</span>}
+                </span>
+              );
+              bar = <MiniBar value={paid} max={Math.max(est, paid)} over={est > 0 && paid > est} />;
+            } else {
+              const done = c.toggle ? all.filter((r) => r[c.toggle!]).length : 0;
+              summary = done === all.length ? (
+                <span className="text-[12.5px] text-emerald">✓ beres</span>
+              ) : (
+                <span className="num text-[12.5px] text-ink-2">{done}/{all.length}</span>
+              );
+              bar = <MiniBar value={done} max={all.length} />;
+            }
+            return (
+              <div key={G.name} className="border-b border-line">
+                <h3>
+                  <button type="button" className="fold-head flex w-full items-center gap-3 py-2.5 text-left"
+                    aria-expanded={isOpen} aria-controls={panel} onClick={() => flip(G.name)} disabled={forcedOpen}>
+                    <svg aria-hidden viewBox="0 0 12 12" className="caret size-3 flex-none text-ink-2"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="display truncate text-[1.3rem] leading-tight">{G.name}</span>
+                        {summary}
+                      </span>
+                      <span className="mt-1.5 flex items-center gap-3">
+                        <span className="flex-1">{bar}</span>
+                        <span className="num w-14 flex-none text-right text-[11px] text-ink-3">{all.length} item</span>
+                      </span>
+                    </span>
+                  </button>
+                </h3>
+                <div id={panel} className="fold" data-open={isOpen} inert={!isOpen}>
+                  <div>
+                    <div className="pb-3 pl-6">
+                      {G.subs.map((S) => (
+                        <div key={S.name}>
+                          {S.name && <p className="eyebrow mt-3 mb-0.5">{S.name}</p>}
+                          <ul>{S.rows.map(renderRow)}</ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         groups.map((G) => (
           <div key={G.name} className={G.name ? "mt-6 first:mt-2" : ""}>

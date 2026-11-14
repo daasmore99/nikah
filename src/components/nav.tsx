@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const NAV = [
   { href: "/", label: "Ringkasan", short: "Ringkas" },
@@ -44,19 +44,41 @@ export function SideNav() {
 export function BottomNav() {
   const path = usePathname();
   const [more, setMore] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  // Tutup panel "Lainnya" setiap kali rute berubah. Klik item di bar bawah
+  // (Ringkas/Tabungan/...) tidak melewati onClick panel, jadi panel dulu tertinggal terbuka.
+  const [lastPath, setLastPath] = useState(path);
+  if (lastPath !== path) {
+    setLastPath(path);
+    setMore(false);
+  }
+  useEffect(() => {
+    if (!more) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMore(false);
+      btn.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [more]);
   const main = NAV.slice(0, 4);
   const rest = NAV.slice(4);
   const restActive = rest.some((n) => isActive(path, n.href));
   return (
     <>
       {more && (
-        <div className="fixed inset-0 z-40 bg-ink/30 md:hidden" onClick={() => setMore(false)}>
-          <nav aria-label="Menu lainnya" className="absolute inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] border-t border-line bg-sheet px-5 py-3"
+        <div className="fixed inset-0 z-40 bg-[var(--scrim)] md:hidden" onClick={() => { setMore(false); btn.current?.focus(); }}>
+          <nav id="menu-lainnya" aria-label="Menu lainnya" className="menu-panel absolute inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] px-3 pb-2 pt-5"
             onClick={(e) => e.stopPropagation()}>
             <ul>
               {rest.map((n) => (
-                <li key={n.href} className="border-b border-line-2 last:border-0">
-                  <Link href={n.href} onClick={() => setMore(false)} className={`block py-3 text-[16px] ${isActive(path, n.href) ? "text-emerald" : ""}`}>{n.label}</Link>
+                <li key={n.href} className="border-b border-line last:border-0">
+                  <Link href={n.href} onClick={() => setMore(false)} aria-current={isActive(path, n.href) ? "page" : undefined}
+                    className={`menu-item flex items-baseline gap-3 px-2 py-3 text-[16px] ${isActive(path, n.href) ? "font-medium text-emerald" : "text-ink"}`}>
+                    <span className={`h-[1em] w-[3px] self-center ${isActive(path, n.href) ? "bg-emerald" : "bg-emerald/20"}`} aria-hidden />
+                    {n.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -69,7 +91,7 @@ export function BottomNav() {
             const on = isActive(path, n.href);
             return (
               <li key={n.href}>
-                <Link href={n.href} aria-current={on ? "page" : undefined}
+                <Link href={n.href} aria-current={on ? "page" : undefined} onClick={() => setMore(false)}
                   className={`flex h-full flex-col items-center justify-center gap-1 text-[12px] ${on ? "text-emerald" : "text-ink-2"}`}>
                   <span className={`h-[3px] w-5 ${on ? "bg-emerald" : "bg-transparent"}`} />
                   {n.short}
@@ -78,7 +100,7 @@ export function BottomNav() {
             );
           })}
           <li>
-            <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more}
+            <button ref={btn} type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} aria-controls="menu-lainnya"
               className={`flex h-full w-full flex-col items-center justify-center gap-1 text-[12px] ${restActive || more ? "text-emerald" : "text-ink-2"}`}>
               <span className={`h-[3px] w-5 ${restActive ? "bg-emerald" : "bg-transparent"}`} />
               Lainnya

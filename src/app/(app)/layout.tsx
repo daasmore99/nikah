@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="mx-auto min-h-dvh max-w-[76rem] md:grid md:grid-cols-[15rem_1fr] md:gap-10 md:px-8">
       {/* desktop rail */}
-      <aside className="hidden md:block">
+      <aside className="rail relative hidden md:block">
         <div className="sticky top-0 flex h-dvh flex-col py-8">
           <Link href="/" className="block">
             <span className="display block text-[2.4rem] leading-[0.95]">
@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <div className="min-w-0">
         {/* header HP */}
-        <header className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
+        <header className="flex items-center justify-between border-b border-line bg-rail/80 px-4 py-3 md:hidden">
           <Link href="/" className="display text-[1.5rem]">
             {p.nama_pria} <em className="text-emerald">&amp;</em> {p.nama_wanita}
           </Link>

@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { requireRepo } from "@/lib/repo";
 import { hitungDana, saldoBerjalan, targetBulanan, todayJakarta } from "@/lib/calc";
 import { ambilHargaOtomatis, pilihHarga, simpanCadangan } from "@/lib/gold";
-import { bulanPanjang, persen, rp, tgl } from "@/lib/format";
-import { Ledger, PageHead, Progress, Section } from "@/components/ui";
+import { bulanPanjang, persen1, rp, tgl } from "@/lib/format";
+import { Ledger, PageHead, SavingsBar, Section } from "@/components/ui";
+import { segmenTabungan } from "@/lib/ringkasan";
 import { SavingsChart } from "@/components/savings-chart";
 import { EntityList } from "@/components/entity-list";
+import { CountUp } from "@/components/motion";
 
 export const metadata: Metadata = { title: "Tabungan" };
 
@@ -20,6 +22,7 @@ export default async function Uang() {
   const sisa = Math.max(0, p.target_dana - dana.terkumpul);
   const tb = targetBulanan(sisa, today, p.tanggal_nikah);
   const grafik = saldoBerjalan(setoran, keluar);
+  const seg = segmenTabungan(dana, p.target_dana);
 
   await simpanCadangan(auto, p, (v) => repo.updatePengaturan(v));
   const emas = pilihHarga(auto, p);
@@ -27,15 +30,21 @@ export default async function Uang() {
   const gram = itemEmas.reduce((a, b) => a + Number(b.gram_emas), 0);
   const nm = { CPP: p.nama_pria, CPW: p.nama_wanita };
   const mAkhir = +p.tanggal_nikah.slice(5, 7) - 1;
+  // penanda berikutnya (25/50/75/100%) yang belum tercapai
+  const milestone = [25, 50, 75, 100]
+    .map((pct) => ({ pct, kurang: Math.ceil((p.target_dana * pct) / 100) - dana.terkumpul }))
+    .find((m) => m.kurang > 0);
 
   return (
-    <div>
-      <PageHead eyebrow="Tabungan bersama" title={rp(dana.terkumpul)}>
-        <span className="num">{persen(dana.terkumpul, p.target_dana)}%</span> dari target <span className="num">{rp(p.target_dana)}</span>.
-        {" "}Angka ini setoran {nm.CPP} dan {nm.CPW}, dikurangi pengeluaran yang diambil dari dana bersama.
+    <div className="stagger">
+      <PageHead eyebrow="Tabungan bersama" title={<CountUp value={dana.terkumpul} format="rp" />}>
+        <span className="num">{persen1(dana.terkumpul, p.target_dana)}%</span> dari target <span className="num">{rp(p.target_dana)}</span>.
+        {milestone && (
+          <> Kurang <span className="num text-emerald">{rp(milestone.kurang)}</span> lagi untuk {milestone.pct}%.</>
+        )}
       </PageHead>
 
-      <Progress value={dana.terkumpul} max={p.target_dana} label="Progres menuju target" />
+      <SavingsBar {...seg} target={p.target_dana} />
 
       <div className="mt-8 grid gap-10 md:grid-cols-[1.6fr_1fr]">
         <div>
@@ -115,14 +124,14 @@ export default async function Uang() {
       </Section>
 
       <Section title="Pengeluaran bareng" aside={<span className="num">{rp(dana.gether)}</span>}>
-        <p className="-mt-2 mb-4 text-[13.5px] text-ink-2">Outcome gether: dipotong dari dana bersama.</p>
+        <p className="-mt-2 mb-4 text-[13.5px] text-ink-2">Dipotong dari dana bersama.</p>
         <EntityList profil={profil} rows={keluar.filter((k) => k.jenis === "gether") as never}
           config={{ table: "pengeluaran", noun: "pengeluaran", primary: "keterangan", secondary: ["tanggal"], amount: "jumlah",
             defaults: { jenis: "gether", potong_dana: true }, hide: ["jenis"], csv: "outcome-gether", empty: "Belum ada pengeluaran." }} />
       </Section>
 
       <Section title="Belanja seserahan" aside={<span className="num">{rp(dana.seserahan)}</span>}>
-        <p className="-mt-2 mb-4 text-[13.5px] text-ink-2">Outcome seserahan. Seperti di sheet, ini dibayar pakai uang pribadi jadi tidak memotong dana bersama (bisa diubah per baris).</p>
+        <p className="-mt-2 mb-4 text-[13.5px] text-ink-2">Pakai uang pribadi, tidak memotong dana bersama.</p>
         <EntityList profil={profil} rows={keluar.filter((k) => k.jenis === "seserahan") as never}
           config={{ table: "pengeluaran", noun: "belanja", primary: "keterangan", secondary: ["tanggal"], amount: "jumlah",
             defaults: { jenis: "seserahan", potong_dana: false }, hide: ["jenis"], csv: "outcome-seserahan", empty: "Belum ada belanja." }} />

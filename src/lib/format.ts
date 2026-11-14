@@ -36,3 +36,7 @@ export const bulanPanjang = (m: number) => BULAN_PANJANG[m - 1];
 export const bulanPendek = (m: number) => BULAN[m - 1];
 
 export const persen = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
+
+/** persen satu desimal, dibulatkan ke bawah supaya 49,96% tidak tampil "50%": 0.4955 -> "49,5" */
+export const persen1 = (a: number, b: number) =>
+  (b > 0 ? Math.floor((a / b) * 1000) / 10 : 0).toLocaleString("id-ID", { maximumFractionDigits: 1 });

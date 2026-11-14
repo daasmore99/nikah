@@ -11,6 +11,8 @@ export interface Field {
   /** boleh isi bebas selain options (datalist) */
   free?: boolean;
   hint?: string;
+  /** contoh isian di dalam kolom, mis. "Contoh: Sewa mobil pengantin" */
+  placeholder?: string;
   wide?: boolean;
 }
 
@@ -53,13 +55,13 @@ export const FIELDS: Record<TableName, Field[]> = {
     { key: "catatan", label: "Catatan", type: "textarea", wide: true },
   ],
   todo: [
-    { key: "bagian", label: "Bagian", type: "text", required: true, free: true },
-    { key: "judul", label: "Yang harus dikerjakan", type: "text", required: true, wide: true },
+    { key: "judul", label: "Nama persiapan", type: "text", required: true, wide: true, placeholder: "Contoh: Sewa mobil pengantin" },
+    { key: "bagian", label: "Tahap", type: "text", required: true, free: true, hint: "Pilih tahap yang sudah ada, atau ketik nama tahap baru." },
+    { key: "tenggat", label: "Tenggat (paling lambat)", type: "date" },
+    { key: "pic", label: "Penanggung jawab (PIC)", type: "text", placeholder: "Contoh: CPP, CPW, atau Ibu" },
+    { key: "progres", label: "Keterangan progres", type: "text", options: ["Belum", "Sudah DP", "Sudah", "Lunas", "Sudah ada"], free: true, placeholder: "Contoh: Sudah DP" },
+    { key: "detail", label: "Catatan / detail", type: "textarea", wide: true, placeholder: "Contoh: Tanya 3 rental dulu, budget maksimal Rp1,5 jt" },
     { key: "selesai", label: "Sudah beres", type: "bool" },
-    { key: "tenggat", label: "Tenggat", type: "date" },
-    { key: "progres", label: "Progres", type: "text", options: ["Belum", "Sudah DP", "Sudah", "Lunas", "Sudah ada"], free: true },
-    { key: "pic", label: "PIC", type: "text" },
-    { key: "detail", label: "Detail", type: "textarea", wide: true },
     { key: "cpp_selesai", label: "Beres untuk CPP", type: "bool" },
     { key: "cpw_selesai", label: "Beres untuk CPW", type: "bool" },
   ],

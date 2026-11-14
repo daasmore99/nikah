@@ -2,7 +2,16 @@
 
 :root {
   --paper: #f5f1e8;
-  --sheet: #fbf9f4;
+  /* lembar/dialog: krem hangat, bukan putih */
+  --sheet: #f3ecdc;
+  /* isian form & checkbox: krem muda (lebih terang dari lembar, tetap bukan putih) */
+  --field: #f9f4e8;
+  /* panel menu "Lainnya" di HP: krem lebih dalam supaya terpisah dari halaman */
+  --menu: #ece2cc;
+  /* alas kartu/seksi: krem hangat transparan di atas kertas */
+  --panel: rgb(232 222 198 / 0.5);
+  /* tirai di belakang lembar/menu: emerald gelap, bukan abu */
+  --scrim: rgb(12 46 35 / 0.38);
   --ink: #18221d;
   --ink-2: #4f5a53;
   --ink-3: #7d857f;
@@ -14,6 +23,18 @@
   --brass: #a46d2b;
   --brass-tint: #f2e6d2;
   --alert: #9b3a22;
+  /* aksen kedua: hanya untuk yang mendesak (tagihan, tenggat) */
+  --clay: #a4472a;
+  --clay-tint: #f5e4da;
+  --brass-ink: #82561c;
+  /* latar hover baris/judul lipat: krem bernada emerald, bukan putih */
+  --hover: rgb(13 74 55 / 0.06);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* gerak grafik: satu easing & durasi untuk bar dan angka (easeOutCubic, sama dengan CountUp) */
+  --ease-steady: cubic-bezier(0.33, 1, 0.68, 1);
+  --dur-steady: 1100ms;
+  /* latar: kolom samping sedikit lebih hangat dari kertas utama */
+  --rail: #f0eadd;
   color-scheme: light;
 }
 
@@ -31,24 +52,86 @@
   --color-brass: var(--brass);
   --color-brass-tint: var(--brass-tint);
   --color-alert: var(--alert);
+  --color-clay: var(--clay);
+  --color-clay-tint: var(--clay-tint);
+  --color-brass-ink: var(--brass-ink);
+  --color-rail: var(--rail);
+  --color-field: var(--field);
+  --color-menu: var(--menu);
   --font-display: var(--font-serif);
   --font-sans: var(--font-body);
   --font-mono: var(--font-plex-mono);
 }
 
+/* Latar kertas: butir sangat tipis (SVG kecil, di-tile) di atas krem.
+   Lapisan nada + ornamen ada di body::before (fixed, di bawah konten). */
 html {
-  background: var(--paper);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .16 .19 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29'/%3E%3C/svg%3E") var(--paper);
   -webkit-text-size-adjust: 100%;
 }
 body {
-  background: var(--paper);
+  background: transparent;
+  position: relative;
   color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.5;
 }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    /* ranting daun emerald di pojok kanan atas */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='%230d4a37' stroke-width='1.1' stroke-opacity='.3' stroke-linecap='round'%3E%3Cpath d='M258 6C214 26 176 60 150 104c-22 38-34 82-38 150'/%3E%3Cpath d='M222 22c-4-14 4-24 18-26-2 14-8 22-18 26z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M198 40c-14-4-20-16-16-30 12 6 18 16 16 30z'/%3E%3Cpath d='M184 62c4-16 16-24 32-22-6 14-16 22-32 22z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M164 82c-14-6-18-20-12-32 12 8 16 18 12 32z'/%3E%3Cpath d='M154 106c6-14 18-20 32-16-8 12-18 18-32 16z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M138 132c-12-8-14-22-6-32 10 10 12 20 6 32z'/%3E%3Cpath d='M130 158c6-12 18-16 30-12-8 10-18 14-30 12z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M120 186c-10-8-12-20-4-30 8 10 10 20 4 30z'/%3E%3Cpath d='M200 2v30M214 2h-28' stroke-width='.6' opacity='.6'/%3E%3C/svg%3E") right -14px top -8px / 190px auto no-repeat,
+    /* ranting kedua (diputar 180°) di pojok kiri bawah, sedikit lebih redup */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='%230d4a37' stroke-width='1.1' stroke-opacity='.24' stroke-linecap='round'%3E%3Cpath d='M2 254C46 234 84 200 110 156c22 -38 34 -82 38 -150'/%3E%3Cpath d='M38 238c4 14 -4 24 -18 26 2 -14 8 -22 18 -26z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M62 220c14 4 20 16 16 30 -12 -6 -18 -16 -16 -30z'/%3E%3Cpath d='M76 198c-4 16 -16 24 -32 22 6 -14 16 -22 32 -22z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M96 178c14 6 18 20 12 32 -12 -8 -16 -18 -12 -32z'/%3E%3Cpath d='M106 154c-6 14 -18 20 -32 16 8 -12 18 -18 32 -16z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M122 128c12 8 14 22 6 32 -10 -10 -12 -20 -6 -32z'/%3E%3Cpath d='M130 102c-6 12 -18 16 -30 12 8 -10 18 -14 30 -12z' fill='%232c7a5c' fill-opacity='.08'/%3E%3Cpath d='M140 74c10 8 12 20 4 30 -8 -10 -10 -20 -4 -30z'/%3E%3Cpath d='M60 258v-30M46 258h28' stroke-width='.6' opacity='.6'/%3E%3C/svg%3E") left -10px bottom 3.5rem / 150px auto no-repeat,
+    /* pergeseran nada: krem terang di atas, krem hangat di kanan bawah */
+    radial-gradient(110% 60% at 40% -10%, rgb(250 244 230 / 0.75), transparent 60%),
+    radial-gradient(80% 60% at 105% 105%, rgb(222 208 176 / 0.5), transparent 70%);
+}
+@media (min-width: 768px) {
+  body::before {
+    background-size: 320px auto, 240px auto, auto, auto;
+    /* ranting kedua di bawah area konten (kiri bawah tertutup kolom samping di desktop) */
+    background-position: right -14px top -8px, left calc(50% - 4rem) bottom -12px, 0 0, 0 0;
+  }
+}
+/* kedalaman: dua cahaya pudar (krem hangat & hijau sage) yang bergeser sangat pelan.
+   Hanya transform (komposit), tanpa blur; mati total bila kurangi gerak. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: -15%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 30% at 22% 34%, rgb(214 192 148 / 0.32), transparent 70%),
+    radial-gradient(34% 28% at 78% 70%, rgb(124 160 128 / 0.2), transparent 70%);
+  animation: drift 38s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes drift {
+  from {
+    transform: translate3d(-3%, -2%, 0);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0);
+  }
+}
 
 @layer components {
+/* kolom samping desktop: nada sedikit berbeda, memanjang ke tepi kiri layar, garis rambut di kanan */
+.rail::before {
+  content: "";
+  position: absolute;
+  inset: 0 -1.25rem 0 -100vw;
+  z-index: -1;
+  background: var(--rail);
+  border-right: 1px solid var(--line-2);
+}
 /* angka rupiah selalu rata kolom */
 .num {
   font-family: var(--font-plex-mono), ui-monospace, monospace;
@@ -99,11 +182,11 @@ body {
 .btn-primary {
   background: var(--emerald);
   border-color: var(--emerald);
-  color: #fff;
+  color: var(--paper);
 }
 .btn-primary:hover {
   background: #093827;
-  color: #fff;
+  color: var(--paper);
 }
 .btn-ghost {
   border-color: transparent;
@@ -120,7 +203,7 @@ body {
 }
 .btn-danger:hover {
   background: var(--alert);
-  color: #fff;
+  color: var(--paper);
 }
 .btn:disabled {
   opacity: 0.5;
@@ -133,7 +216,7 @@ body {
   padding: 0 0.75rem;
   border: 1px solid var(--line);
   border-radius: 2px;
-  background: #fff;
+  background: var(--field);
   color: var(--ink);
   font-size: 16px; /* cegah zoom iOS */
 }
@@ -163,11 +246,18 @@ textarea.input {
   height: 1.25rem;
   border: 1.5px solid var(--ink-2);
   border-radius: 2px;
-  background: #fff;
+  background: var(--field);
   display: inline-grid;
   place-content: center;
   flex: none;
   cursor: pointer;
+  transition: background-color 0.18s var(--ease-out), border-color 0.18s, transform 0.18s var(--ease-out);
+}
+.check:hover {
+  border-color: var(--emerald);
+}
+.check:active {
+  transform: scale(0.88);
 }
 .check:checked {
   background: var(--emerald);
@@ -177,9 +267,16 @@ textarea.input {
   content: "";
   width: 0.65rem;
   height: 0.35rem;
-  border-left: 2px solid #fff;
-  border-bottom: 2px solid #fff;
+  border-left: 2px solid var(--paper);
+  border-bottom: 2px solid var(--paper);
   transform: translateY(-1px) rotate(-45deg);
+  animation: tick 0.28s var(--ease-out);
+}
+@keyframes tick {
+  from {
+    clip-path: inset(0 100% 0 0);
+    transform: translateY(-1px) rotate(-45deg) scale(0.6);
+  }
 }
 .check:disabled {
   opacity: 0.5;
@@ -198,7 +295,7 @@ dialog.sheet {
   color: var(--ink);
 }
 dialog.sheet::backdrop {
-  background: rgb(24 34 29 / 0.35);
+  background: var(--scrim);
 }
 @media (min-width: 768px) {
   dialog.sheet {
@@ -219,6 +316,20 @@ dialog.sheet::backdrop {
   color: var(--ink-2);
   background: transparent;
   white-space: nowrap;
+}
+.chip {
+  position: relative;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+/* area sentuh 44px tanpa memperbesar chip */
+.chip::after {
+  content: "";
+  position: absolute;
+  inset: -6px -2px;
+}
+.chip:hover {
+  border-color: var(--ink-2);
+  color: var(--ink);
 }
 .chip[aria-pressed="true"] {
   background: var(--ink);
@@ -251,4 +362,293 @@ dialog.sheet::backdrop {
   scrollbar-width: none;
 }
 
+/* status bayar: titik kecil + teks, tanpa kotak berulang */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
+.status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* baris daftar: target sentuh dan hover yang jelas */
+.row-btn {
+  min-height: 2.75rem;
+  border-radius: 2px;
+  transition: background-color 0.15s;
+}
+.row-btn:hover {
+  background: var(--hover);
+}
+
+/* buka-tutup dengan transisi tinggi: grid 0fr -> 1fr */
+.fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s var(--ease-out);
+}
+.fold[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.fold > div {
+  overflow: hidden;
+  min-height: 0;
+}
+.fold-head {
+  min-height: 3.25rem;
+  transition: background-color 0.15s;
+}
+.fold-head:hover {
+  background: var(--hover);
+}
+.caret {
+  transition: transform 0.25s var(--ease-out);
+}
+[aria-expanded="true"] .caret {
+  transform: rotate(90deg);
+}
+
+/* kartu/seksi berlapis: alas krem hangat + garis emerald di atas + kisi belah ketupat tipis di tepi atas */
+.panel {
+  position: relative;
+  background-color: var(--panel);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8' fill='none' stroke='%230d4a37' stroke-opacity='.22' stroke-width='.8'%3E%3Cpath d='M0 4 7 .5 14 4 7 7.5z'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgb(244 236 216 / 0.7), transparent 5rem);
+  background-repeat: repeat-x, no-repeat;
+  background-position: 0 4px, 0 0;
+  border: 1px solid var(--line-2);
+  border-top: 2px solid rgb(13 74 55 / 0.4);
+  border-radius: 3px;
+  padding: 1.5rem 1rem 1.25rem;
+}
+@media (min-width: 768px) {
+  .panel {
+    padding: 1.6rem 1.4rem 1.4rem;
+  }
+}
+/* judul seksi: pita nada pudar di kiri supaya judul punya alas */
+.sec-head {
+  background: linear-gradient(90deg, var(--panel), transparent 85%);
+  padding: 0.5rem 0.6rem 0.5rem;
+  margin-inline: -0.6rem;
+}
+
+/* menu "Lainnya" di HP */
+.menu-panel {
+  background-color: var(--menu);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8' fill='none' stroke='%230d4a37' stroke-opacity='.28' stroke-width='.8'%3E%3Cpath d='M0 4 7 .5 14 4 7 7.5z'/%3E%3C/svg%3E"),
+    radial-gradient(90% 120% at 100% 0%, rgb(124 160 128 / 0.18), transparent 60%);
+  background-repeat: repeat-x, no-repeat;
+  background-position: 0 6px, 0 0;
+  border-top: 2px solid var(--emerald);
+  box-shadow: 0 -8px 24px rgb(12 46 35 / 0.14);
+}
+.menu-item {
+  transition: background-color 0.15s;
+}
+.menu-item:hover {
+  background: var(--hover);
+}
+
+}
+
+/* ---------- gerak ---------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+/* anak langsung muncul bergantian, total jeda <= 300ms */
+.stagger > * {
+  animation: rise 0.45s var(--ease-out) backwards;
+}
+.stagger > :nth-child(2) { animation-delay: 60ms; }
+.stagger > :nth-child(3) { animation-delay: 120ms; }
+.stagger > :nth-child(4) { animation-delay: 180ms; }
+.stagger > :nth-child(5) { animation-delay: 240ms; }
+.stagger > :nth-child(n + 6) { animation-delay: 300ms; }
+
+.bar-fill {
+  transform-origin: left center;
+  animation: grow var(--dur-steady) var(--ease-steady) var(--d, 150ms) backwards;
+}
+/* bar bersegmen (tabungan): dibuka dari kiri sekaligus, jadi hijau + terpakai tetap menyambung */
+@keyframes clip-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+.bar-clip {
+  animation: clip-in var(--dur-steady) var(--ease-steady) var(--d, 150ms) backwards;
+}
+/* di dalam <Reveal>: animasi masuk menunggu sampai grafik terlihat */
+.reveal:not([data-seen]) .bar-fill,
+.reveal:not([data-seen]) .bar-clip {
+  animation-play-state: paused;
+}
+
+/* ---------- gerak ambient grafik (loop pelan, hanya transform/background-position) ---------- */
+/* kilau tipis mengalir di bagian bar yang terisi */
+@keyframes sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 28%;
+  background: linear-gradient(90deg, transparent, rgb(245 241 232 / 0.32), transparent);
+  transform: translateX(-100%);
+  animation: sheen 5.5s linear calc(var(--d, 150ms) + var(--dur-steady)) infinite;
+  animation-play-state: paused;
+  will-change: transform;
+}
+/* segmen "sudah terpakai": arsir diagonal tipis terakota yang bergeser pelan seperti garis semut */
+@keyframes ants {
+  to {
+    background-position: 6px 0;
+  }
+}
+.hatch {
+  background-color: var(--clay-tint);
+  background-image: linear-gradient(135deg, var(--clay) 18%, transparent 18% 50%, var(--clay) 50% 68%, transparent 68%);
+  background-size: 6px 6px;
+}
+.hatch-run {
+  animation: ants 2.4s linear infinite;
+  animation-play-state: paused;
+}
+.reveal[data-play="on"] .sheen::after,
+.reveal[data-play="on"] .hatch-run {
+  animation-play-state: running;
+}
+/* ---------- grafik tabungan: gerak tenang terus-menerus ---------- */
+/* jalur menuju target: garis putus mengalir pelan ke arah titik target (periode dash 5+4 = 9) */
+@keyframes path-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+.path-flow {
+  animation: path-flow 4s linear infinite;
+  animation-play-state: paused;
+}
+/* titik "hari ini": cincin melebar lalu memudar */
+@keyframes ring-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+.ring-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: ring-pulse 3s var(--ease-out) infinite;
+  animation-play-state: paused;
+}
+/* titik target: kedip sangat halus */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.twinkle {
+  animation: twinkle 3.6s ease-in-out infinite;
+  animation-play-state: paused;
+}
+/* kilau tipis yang sesekali menyusuri garis saldo (pathLength = 1) */
+@keyframes glint {
+  0% {
+    stroke-dashoffset: 0.08;
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.9;
+  }
+  40% {
+    opacity: 0.9;
+  }
+  45%,
+  100% {
+    stroke-dashoffset: -1;
+    opacity: 0;
+  }
+}
+.glint {
+  stroke-dasharray: 0.08 2;
+  opacity: 0;
+  animation: glint 6s linear 1.4s infinite;
+  animation-play-state: paused;
+}
+.reveal[data-play="on"] .path-flow,
+.reveal[data-play="on"] .ring-pulse,
+.reveal[data-play="on"] .twinkle,
+.reveal[data-play="on"] .glint {
+  animation-play-state: running;
+}
+
+.line-draw {
+  stroke-dasharray: 1;
+  animation: draw 1.2s var(--ease-out) 0.2s backwards;
+}
+.fade-in {
+  animation: fade 0.6s var(--ease-out) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+

@@ -100,7 +100,7 @@ export function FormSheet({
             const common = {
               id, name: f.key, "aria-invalid": err ? true : undefined,
               "aria-describedby": err ? `${id}-e` : f.hint ? `${id}-h` : undefined,
-              className: "input", required: f.required,
+              className: "input", required: f.required, placeholder: f.placeholder,
             };
             const strV = typeof v === "string" ? v : "";
             const set = (x: string) => setVals((s) => ({ ...s, [f.key]: x }));
