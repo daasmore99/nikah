@@ -30,9 +30,7 @@ export function ResetDemo() {
 
   return (
     <div className="max-w-[32rem] border border-clay/40 bg-clay-tint px-4 py-4">
-      <p className="text-[14px] text-ink">
-        Semua isi akun demo (daftar, tabungan, nama, tanggal, angka di Pengaturan) akan dihapus dan kembali kosong. Data asli tidak tersentuh.
-      </p>
+      <p className="text-[14px] text-ink">Kosongkan semua data demo?</p>
       <label htmlFor="reset-konfirmasi" className="mt-3 mb-1.5 block text-[13px] font-medium text-ink-2">
         Ketik <span className="num">RESET</span> untuk melanjutkan
       </label>

@@ -41,7 +41,7 @@ export default async function Pengaturan() {
       {repo.mode === "demo" && (
         <Section title="Data demo" id="reset-demo">
           <p className="-mt-1 mb-4 max-w-[38rem] text-[14px] text-ink-2">
-            Akun ini memakai penyimpanan terpisah dari data asli. Isi apa saja untuk mencoba fitur, lalu kosongkan lagi di sini.
+            Isi apa saja untuk mencoba fitur, lalu kosongkan lagi di sini.
           </p>
           <ResetDemo />
         </Section>

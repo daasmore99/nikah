@@ -4,10 +4,10 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { emptyPengaturan, judulPasangan, localDemoFlag, localFileFor, resolveStore, schemaFor } from "../src/lib/demo";
+import { DATA_TABLES, DEMO_BELUM_SIAP, emptyPengaturan, isMissingRelation, judulPasangan, localDemoFlag, localFileFor, resolveStore, tableFor } from "../src/lib/demo";
 import { localRepo } from "../src/lib/local-store";
 import { TABLE_NAMES } from "../src/lib/types";
 
@@ -20,9 +20,49 @@ test("resolveStore: anggota -> asli, penonton -> demo, tak dikenal -> ditolak", 
   assert.equal(resolveStore({ anggota: true, penonton: true }), "demo");
 });
 
-test("skema dan file per penyimpanan", () => {
-  assert.equal(schemaFor("asli"), "public");
-  assert.equal(schemaFor("demo"), "demo");
+test("tableFor: demo -> demo_<tabel>, asli -> <tabel>, semua 12 tabel terpetakan", () => {
+  assert.equal(DATA_TABLES.length, 12);
+  assert.equal(new Set(DATA_TABLES).size, 12);
+  assert.deepEqual([...DATA_TABLES].sort(), ["pengaturan", ...TABLE_NAMES].sort());
+  const asli = new Set(DATA_TABLES.map((t) => tableFor("asli", t)));
+  for (const t of DATA_TABLES) {
+    assert.equal(tableFor("asli", t), t);
+    assert.equal(tableFor("demo", t), `demo_${t}`);
+    // tabel demo tidak pernah sama dengan tabel asli mana pun
+    assert.ok(!asli.has(tableFor("demo", t)), `${t}: tabel demo bentrok dengan tabel asli`);
+    assert.notEqual(tableFor("demo", t), tableFor("asli", t));
+  }
+  // nama yang dipakai migrasi 20261115010000_demo_public.sql
+  const sql = readFileSync(join(__dirname, "..", "supabase", "migrations", "20261115010000_demo_public.sql"), "utf8");
+  const kode = sql.replace(/--.*$/gm, ""); // tanpa komentar
+  const truncate = /truncate([^;]*);/.exec(kode)?.[1] ?? "";
+  for (const t of DATA_TABLES) {
+    assert.ok(kode.includes(`create table if not exists public.demo_${t} `), `migrasi: demo_${t}`);
+    assert.match(kode, new RegExp(`public\\.demo_${t}\\s+\\(like public\\.${t}\\s+including all\\)`), `migrasi: like ${t}`);
+    if (t !== "pengaturan") assert.match(truncate, new RegExp(`public\\.demo_${t}\\b`), `reset: demo_${t}`);
+  }
+  // reset hanya menyentuh demo_*, dan migrasi tidak pernah drop skema/tabel otomatis
+  for (const m of truncate.matchAll(/public\.(\w+)/g)) assert.ok(m[1].startsWith("demo_"), `reset menyentuh ${m[1]}`);
+  assert.doesNotMatch(kode, /drop\s+(schema|table)/i);
+});
+
+test("migrasi demo_public = gabungan 3 bagian di scratchpad (kalau ada)", () => {
+  const dir = process.env.DEMO_PARTS_DIR;
+  if (!dir) return;
+  const gabung = ["demo2_part1.sql", "demo2_part2.sql", "demo2_part3.sql"].map((f) => readFileSync(join(dir, f), "utf8")).join("");
+  assert.equal(gabung, readFileSync(join(__dirname, "..", "supabase", "migrations", "20261115010000_demo_public.sql"), "utf8"));
+});
+
+test("isMissingRelation: tabel/fungsi belum ada dikenali, error lain tidak", () => {
+  assert.equal(isMissingRelation({ code: "PGRST205", message: "Could not find the table 'public.demo_tamu' in the schema cache" }), true);
+  assert.equal(isMissingRelation({ code: "42P01", message: 'relation "public.demo_tamu" does not exist' }), true);
+  assert.equal(isMissingRelation({ code: "PGRST202", message: "Could not find the function public.reset_demo" }), true);
+  assert.equal(isMissingRelation({ code: "42501", message: "permission denied" }), false);
+  assert.equal(isMissingRelation(null), false);
+  assert.match(DEMO_BELUM_SIAP, /^Penyimpanan demo belum disiapkan/);
+});
+
+test("file per penyimpanan", () => {
   assert.equal(localFileFor("asli"), "db.json");
   assert.equal(localFileFor("demo"), "demo.json");
 });
@@ -110,11 +150,25 @@ test("repo asli lokal menolak reset demo", async () => {
   }
 });
 
-test("repo Supabase: semua tabel data lewat klien per-skema (db), bukan langsung sb", () => {
+test("repo Supabase: semua tabel data lewat tableFor(mode, ...), tanpa skema demo dan tanpa fallback", () => {
   const src = readFileSync(join(__dirname, "..", "src", "lib", "repo.ts"), "utf8");
-  const langsung = [...src.matchAll(/\bsb\.from\("([^"]+)"\)/g)].map((m) => m[1]);
-  // hanya profil (tabel public, dibaca di cabang anggota saja) yang boleh langsung
-  assert.deepEqual(langsung, ["profil"]);
+  const froms = [...src.matchAll(/\.from\(([^)]*\)?)\)/g)].map((m) => m[1]);
+  assert.ok(froms.length >= 10);
+  // satu-satunya pengecualian: profil (tabel identitas anggota, hanya di cabang asli)
+  const langsung = froms.filter((f) => !/^tableFor\(mode, (table|"pengaturan")\)$/.test(f));
+  assert.deepEqual(langsung, ['"profil"']);
   assert.match(src, /if \(mode === "demo"\) return \{ \[repo\.user\.id\]: repo\.user\.nama \};\s*const \{ data \} = await sb\.from\("profil"\)/);
-  assert.match(src, /mode === "demo" \? sb\.schema\(schemaFor\("demo"\)\) : sb/);
+  assert.doesNotMatch(src, /\.schema\(/);
+  assert.doesNotMatch(src, /schemaFor/);
+  // rpc hanya fungsi identifikasi + reset_demo (yang sendiri mengecek is_penonton)
+  assert.deepEqual([...src.matchAll(/\.rpc\("([^"]+)"\)/g)].map((m) => m[1]).sort(), ["is_anggota", "is_penonton", "reset_demo"]);
+  // tabel demo belum ada -> pesan jelas untuk akun demo, bukan jatuh ke tabel asli
+  assert.match(src, /mode === "demo" && isMissingRelation\(e\)\) throw new RepoError\(DEMO_BELUM_SIAP\)/);
+});
+
+test("tidak ada kode yang memakai skema demo lama", () => {
+  const walk = (d: string): string[] =>
+    readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
+  for (const f of walk(join(__dirname, "..", "src")).filter((f) => /\.(ts|tsx)$/.test(f)))
+    assert.doesNotMatch(readFileSync(f, "utf8"), /\.schema\(/, f);
 });

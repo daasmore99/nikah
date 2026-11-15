@@ -7,6 +7,8 @@ import { Progress, SavingsBar } from "@/components/ui";
 import { CountUp, Reveal } from "@/components/motion";
 import { CouplePhoto } from "@/components/couple-photo";
 import { NextTodo } from "@/components/next-todo";
+import { DemoWelcome } from "@/components/demo-welcome";
+import { showGuide } from "@/lib/demo";
 
 export default async function Ringkasan() {
   const repo = await requireRepo();
@@ -39,6 +41,7 @@ export default async function Ringkasan() {
 
   return (
     <div className="stagger">
+      {showGuide(repo.mode) && <DemoWelcome />}
       {/* fokus: hitung mundur + foto */}
       <section className="flex items-start justify-between gap-5 border-b border-line pb-8">
         <div className="min-w-0">

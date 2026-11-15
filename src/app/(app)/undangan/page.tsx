@@ -60,7 +60,7 @@ export default async function Undangan() {
           <EntityList profil={profil} rows={digital as never}
             config={{ table: "katalog", noun: "undangan digital", primary: "nama", toggle: "dipilih", amount: "harga", link: "link",
               defaults: { jenis: "undangan_digital" }, hide: ["jenis"], csv: "katalog-undangan-digital",
-              empty: "Di sheet hanya ada tombol “Order disini” tanpa link. Tambahkan pilihan di sini." }} />
+              empty: "Belum ada pilihan undangan digital." }} />
         </Section>
       </div>
     </div>

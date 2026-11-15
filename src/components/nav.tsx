@@ -27,14 +27,21 @@ export const NAV = [
     desc: "Nama mempelai, tanggal nikah, target dana, harga emas manual, angka souvenir, dan reset data demo." },
 ];
 
+/** Menu Panduan: hanya untuk akun demo (lihat showGuide). */
+export const PANDUAN_NAV = { href: "/panduan", label: "Panduan", short: "Panduan",
+  desc: "Cara memakai tiap halaman, dengan langkah singkat yang bisa langsung dicoba." };
+
+/** Menu untuk jenis akun ini: akun asli tidak pernah mendapat tautan Panduan. */
+export const navFor = (demo: boolean) => (demo ? [...NAV, PANDUAN_NAV] : NAV);
+
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
-export function SideNav() {
+export function SideNav({ demo = false }: { demo?: boolean }) {
   const path = usePathname();
   return (
     <nav aria-label="Menu utama">
       <ol className="space-y-0.5">
-        {NAV.map((n, i) => {
+        {navFor(demo).map((n, i) => {
           const on = isActive(path, n.href);
           return (
             <li key={n.href}>
@@ -51,7 +58,7 @@ export function SideNav() {
   );
 }
 
-export function BottomNav() {
+export function BottomNav({ demo = false }: { demo?: boolean }) {
   const path = usePathname();
   const [more, setMore] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
@@ -72,8 +79,9 @@ export function BottomNav() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [more]);
-  const main = NAV.slice(0, 4);
-  const rest = NAV.slice(4);
+  const items = navFor(demo);
+  const main = items.slice(0, 4);
+  const rest = items.slice(4);
   const restActive = rest.some((n) => isActive(path, n.href));
   return (
     <>
@@ -125,7 +133,7 @@ export function BottomNav() {
 /** Akun demo: satu kalimat tentang isi halaman ini, supaya penonton tahu fitur yang bisa dicoba. */
 export function DemoIntro() {
   const path = usePathname();
-  const n = NAV.find((x) => isActive(path, x.href));
+  const n = navFor(true).find((x) => isActive(path, x.href));
   if (!n) return null;
   return (
     <aside aria-label="Tentang halaman ini" className="mb-6 border-l-2 border-emerald bg-sheet px-4 py-3">

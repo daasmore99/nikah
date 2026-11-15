@@ -13,8 +13,8 @@ src/app/(app)/        halaman setelah login: ringkasan, uang, biaya, persiapan, 
 src/app/login/        halaman masuk (email + kata sandi)
 src/app/actions.ts    server actions: tambah/ubah/hapus + validasi + login/keluar
 src/proxy.ts          refresh sesi Supabase, arahkan tamu ke /login
-src/lib/repo.ts       akses data (Supabase, atau file lokal untuk mencoba); akun demo -> skema demo
-src/lib/demo.ts       aturan akun demo (anggota -> data asli, penonton -> demo)
+src/lib/repo.ts       akses data (Supabase, atau file lokal untuk mencoba); akun demo -> tabel public.demo_*
+src/lib/demo.ts       aturan akun demo (anggota -> data asli, penonton -> demo) + tableFor()
 src/lib/fields.ts     definisi kolom tiap tabel (form + validasi server)
 src/lib/calc.ts       hitungan: dana terkumpul, target bulanan, biaya, countdown
 src/lib/gold.ts       harga emas otomatis + cadangan
@@ -70,18 +70,31 @@ Kolom `created_by` / `updated_by` terisi otomatis dari akun yang menginput.
 
 ### 1b. Akun demo (opsional)
 
-Akun ketiga untuk melihat-lihat dan mencoba semua fitur. Bisa tambah/ubah/hapus, tapi datanya di skema
-Postgres terpisah `demo` yang mulai kosong (tanpa nama mempelai, tanggal, atau angka). Akun demo tidak pernah
-membaca atau menulis data asli, dan foto `public/foto-kami.jpg` tidak ditampilkan untuknya.
+Akun ketiga untuk melihat-lihat dan mencoba semua fitur. Bisa tambah/ubah/hapus, tapi datanya di tabel
+terpisah berawalan `demo_` (`public.demo_tamu`, `public.demo_pengaturan`, dst.) yang mulai kosong (tanpa nama
+mempelai, tanggal, atau angka). RLS: tabel `demo_*` hanya terbuka untuk email di `penonton`, tabel asli hanya
+untuk email di `anggota`. Akun demo tidak pernah membaca atau menulis data asli, dan foto `public/foto-kami.jpg`
+tidak ditampilkan untuknya. Tidak perlu membuka skema tambahan di Data API (`demo_*` ada di skema `public`).
 
-1. **SQL Editor** → tempel isi `supabase/migrations/20261115000000_demo.sql` → Run (aman diulang).
-2. **Project Settings → API (Data API) → Exposed schemas**: tambahkan `demo` → Save.
-3. Daftarkan email demo (SQL Editor). **Jangan** masukkan email ini ke `anggota`:
+1. **SQL Editor** → jalankan `supabase/migrations/20261115010000_demo_public.sql` dalam 3 bagian, berurutan,
+   masing-masing di query baru → Run (semuanya aman diulang):
+   - BAGIAN 1: tabel `demo_*` + pengaturan demo kosong (+ memastikan `penonton` / `is_penonton()` ada)
+   - BAGIAN 2: trigger audit + RLS + policy
+   - BAGIAN 3: fungsi `reset_demo()`
+
+   Batas tiap bagian ditandai `-- ===== BAGIAN n =====` di file. Kalau file utuh bisa ditempel sekaligus, itu juga boleh.
+2. Daftarkan email demo (SQL Editor). **Jangan** masukkan email ini ke `anggota`:
    ```sql
-   insert into public.penonton (email) values ('email-demo@contoh.com');
+   insert into public.penonton (email) values ('email-demo@contoh.com') on conflict do nothing;
    ```
-4. **Authentication → Users → Add user → Create new user**: email yang sama, centang *Auto Confirm User*, isi kata sandi.
-5. Tidak perlu env tambahan atau redeploy: siapa akun demo ditentukan tabel `penonton`.
+3. **Authentication → Users → Add user → Create new user**: email yang sama, centang *Auto Confirm User*, isi kata sandi.
+4. Tidak perlu env tambahan atau redeploy: siapa akun demo ditentukan tabel `penonton`.
+
+Kalau akun demo melihat "Penyimpanan demo belum disiapkan", migrasi di langkah 1 belum (lengkap) dijalankan.
+
+Catatan: skema `demo` dari `20261115000000_demo.sql` versi lama **tidak dipakai lagi** (butuh "Exposed schemas"
+yang tidak tersedia). Tabel `penonton` dan `is_penonton()` dari file itu tetap dipakai. Skema lama boleh dihapus
+manual kapan saja: `drop schema if exists demo cascade;` (migrasi tidak menghapusnya otomatis).
 
 Isi demo bisa dikosongkan lagi di **Pengaturan → Data demo → Reset data demo** (konfirmasi dua langkah).
 Semua akun di `penonton` berbagi satu data demo yang sama.

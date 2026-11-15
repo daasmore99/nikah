@@ -1,24 +1,47 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireRepo } from "@/lib/repo";
+import { RepoError, requireRepo, type Repo } from "@/lib/repo";
+import type { Pengaturan } from "@/lib/types";
 import { localMode } from "@/lib/env";
 import { daysBetween, todayJakarta } from "@/lib/calc";
 import { tglPanjang } from "@/lib/format";
 import { judulPasangan } from "@/lib/demo";
 import { BottomNav, DemoIntro, SideNav } from "@/components/nav";
+import { LoadError } from "@/components/load-error";
 import { signOut } from "../actions";
 
 /** Judul tab dari nama di Pengaturan; akun demo yang belum mengisi nama memakai judul netral. */
 export async function generateMetadata(): Promise<Metadata> {
-  const repo = await requireRepo();
-  const judul = judulPasangan(await repo.pengaturan());
+  const r = await muat();
+  if ("error" in r) return { title: { absolute: "Gagal memuat · Tracker Pernikahan" } };
+  const judul = judulPasangan(r.p);
   // absolute: judul halaman Ringkasan tidak ikut template root ("X · Tracker Pernikahan")
   return { title: { absolute: judul, template: `%s · ${judul}` } };
 }
 
+/**
+ * Repo + pengaturan untuk kerangka halaman. RepoError (mis. "Penyimpanan demo belum disiapkan",
+ * akun belum terdaftar) dikembalikan sebagai pesan supaya tampil sebagai panel ramah: error yang
+ * dilempar dari layout ini tidak tertangkap (app)/error.tsx, dan di production pesannya disembunyikan.
+ * Error lain (redirect login, jaringan) tetap dilempar ke boundary (src/app/error.tsx).
+ */
+async function muat(): Promise<{ repo: Repo; p: Pengaturan } | { error: string }> {
+  try {
+    const repo = await requireRepo();
+    return { repo, p: await repo.pengaturan() };
+  } catch (e) {
+    if (e instanceof RepoError) {
+      console.error("[layout (app)]", e.message);
+      return { error: e.message };
+    }
+    throw e;
+  }
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const repo = await requireRepo();
-  const p = await repo.pengaturan();
+  const r = await muat();
+  if ("error" in r) return <LoadError message={r.error} />;
+  const { repo, p } = r;
   const demo = repo.mode === "demo";
   const sisa = p.tanggal_nikah ? daysBetween(todayJakarta(), p.tanggal_nikah) : null;
   const adaNama = Boolean(p.nama_pria.trim() && p.nama_wanita.trim());
@@ -40,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <p className="mt-3 text-[13px] text-ink-2">{tglPanjang(p.tanggal_nikah)}</p>
           {demo && <p className="mt-2 inline-block self-start border border-emerald/40 bg-emerald-tint px-2 py-0.5 text-[11.5px] tracking-[0.04em] text-emerald uppercase">Akun demo</p>}
           <div className="rule my-6" />
-          <SideNav />
+          <SideNav demo={demo} />
           <div className="mt-auto space-y-2 text-[12.5px] text-ink-3">
             <p>Masuk sebagai {repo.user.nama}</p>
             <form action={signOut}><button className="underline hover:text-ink">Keluar</button></form>
@@ -60,8 +83,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
         {demo && (
           <p role="note" className="sticky top-0 z-30 border-b border-emerald/30 bg-emerald-tint px-4 py-2 text-[12.5px] text-emerald md:mt-4 md:border">
-            <strong className="font-medium">Akun demo:</strong> data terpisah dari data asli, boleh diisi bebas. Bisa direset di{" "}
-            <Link href="/pengaturan#reset-demo" className="underline">Pengaturan</Link>.
+            <strong className="font-medium">Akun demo</strong>
           </p>
         )}
         {localMode && (
@@ -74,7 +96,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
-      <BottomNav />
+      <BottomNav demo={demo} />
     </div>
   );
 }

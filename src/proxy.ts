@@ -5,6 +5,8 @@ import { localDemo } from "./lib/env";
 /** Foto asli pasangan di public/: tidak boleh terbuka untuk akun demo. */
 const FOTO_ASLI = "/foto-kami.jpg";
 const notFound = () => new NextResponse("Not found", { status: 404 });
+/** Panduan pemakaian hanya untuk akun demo: akun asli mendapat 404 sungguhan (halaman juga memanggil notFound). */
+const isPanduan = (path: string) => path === "/panduan" || path.startsWith("/panduan/");
 
 /**
  * Refresh sesi Supabase dan arahkan tamu (belum login) ke /login.
@@ -15,7 +17,12 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const foto = request.nextUrl.pathname === FOTO_ASLI;
-  if (!url || !key) return foto && localDemo ? notFound() : NextResponse.next();
+  const panduan = isPanduan(request.nextUrl.pathname);
+  if (!url || !key) {
+    if (foto && localDemo) return notFound();
+    if (panduan && !localDemo) return notFound();
+    return NextResponse.next();
+  }
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
@@ -43,6 +50,10 @@ export async function proxy(request: NextRequest) {
       const { data: anggota } = await supabase.rpc("is_anggota");
       if (penonton === true || anggota !== true) return notFound();
     }
+  }
+  if (panduan && data?.claims) {
+    const { data: penonton, error } = await supabase.rpc("is_penonton");
+    if (error || penonton !== true) return notFound();
   }
   return response;
 }
