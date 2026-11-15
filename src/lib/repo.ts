@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { localMode, supabaseConfigured } from "./env";
 import { createClient } from "./supabase/server";
 import type { ImportData, Pengaturan, Row, TableName } from "./types";
+import { groupSameValues, type RowChange } from "./bulk";
 
 export interface User {
   id: string;
@@ -21,6 +22,16 @@ export interface Repo {
   insert(table: TableName, values: Record<string, unknown>): Promise<void>;
   update(table: TableName, id: string, values: Record<string, unknown>): Promise<void>;
   remove(table: TableName, id: string): Promise<void>;
+  /** Satu INSERT berisi banyak baris: semua masuk atau tidak sama sekali. */
+  insertMany(table: TableName, rows: Record<string, unknown>[]): Promise<void>;
+  /**
+   * Ubah banyak baris. Perubahan dengan nilai identik dikirim sebagai satu UPDATE (atomik per kelompok);
+   * di Supabase, kelompok yang berbeda dijalankan berurutan, jadi bisa sebagian berhasil.
+   * Hasil: id yang berhasil dan yang gagal (dengan pesan).
+   */
+  updateMany(table: TableName, changes: RowChange[]): Promise<BatchOutcome>;
+  /** Satu DELETE ... WHERE id IN (...): semua atau tidak sama sekali. Hasil: jumlah yang terhapus. */
+  removeMany(table: TableName, ids: string[]): Promise<number>;
   pengaturan(): Promise<Pengaturan>;
   updatePengaturan(values: Record<string, unknown>): Promise<void>;
   /** id user -> nama, untuk "dicatat oleh" */
@@ -28,6 +39,11 @@ export interface Repo {
 }
 
 export class RepoError extends Error {}
+
+export interface BatchOutcome {
+  done: string[];
+  failed: { id: string; message: string }[];
+}
 
 /* ---------------- Supabase ---------------- */
 
@@ -59,6 +75,31 @@ async function supabaseRepo(): Promise<Repo | null> {
     async remove(table, id) {
       const { error } = await sb.from(table).delete().eq("id", id);
       fail("Menghapus", error);
+    },
+    async insertMany(table, rows) {
+      const { error } = await sb.from(table).insert(rows);
+      fail("Menyimpan", error);
+    },
+    async updateMany(table, changes) {
+      const out: BatchOutcome = { done: [], failed: [] };
+      for (const g of groupSameValues(changes)) {
+        const { data, error } = await sb.from(table).update(g.values).in("id", g.ids).select("id");
+        if (error) {
+          for (const id of g.ids) out.failed.push({ id, message: `Mengubah gagal: ${error.message}` });
+          continue;
+        }
+        const ok = new Set((data ?? []).map((r) => r.id as string));
+        for (const id of g.ids) {
+          if (ok.has(id)) out.done.push(id);
+          else out.failed.push({ id, message: "Data tidak ditemukan atau tidak ada akses" });
+        }
+      }
+      return out;
+    },
+    async removeMany(table, ids) {
+      const { error, count } = await sb.from(table).delete({ count: "exact" }).in("id", ids);
+      fail("Menghapus", error);
+      return count ?? ids.length;
     },
     async pengaturan() {
       const { data, error } = await sb.from("pengaturan").select("*").eq("id", 1).maybeSingle();
@@ -135,6 +176,41 @@ function localRepo(): Repo {
       const db = loadLocal();
       db.tables[table] = (db.tables[table] ?? []).filter((r) => r.id !== id);
       saveLocal(db);
+    },
+    async insertMany(table, rows) {
+      const db = loadLocal();
+      const now = new Date().toISOString();
+      (db.tables[table] ??= []).push(
+        ...rows.map((values) => ({ id: randomUUID(), created_by: user.id, created_at: now, updated_at: now, ...values })),
+      );
+      saveLocal(db);
+    },
+    async updateMany(table, changes) {
+      // satu kali baca + satu kali tulis: atomik di mode lokal
+      const db = loadLocal();
+      const now = new Date().toISOString();
+      const out: BatchOutcome = { done: [], failed: [] };
+      for (const c of changes) {
+        const row = db.tables[table]?.find((r) => r.id === c.id);
+        if (!row) out.failed.push({ id: c.id, message: "Data tidak ditemukan" });
+        else out.done.push(c.id);
+      }
+      if (out.failed.length)
+        return { done: [], failed: [...out.failed, ...out.done.map((id) => ({ id, message: "Dibatalkan (ada baris lain yang gagal)" }))] };
+      for (const c of changes) {
+        const row = db.tables[table]!.find((r) => r.id === c.id)!;
+        Object.assign(row, c.values, { updated_at: now, updated_by: user.id });
+      }
+      saveLocal(db);
+      return out;
+    },
+    async removeMany(table, ids) {
+      const db = loadLocal();
+      const set = new Set(ids);
+      const before = (db.tables[table] ?? []).length;
+      db.tables[table] = (db.tables[table] ?? []).filter((r) => !set.has(r.id as string));
+      saveLocal(db);
+      return before - db.tables[table].length;
     },
     async pengaturan() {
       return loadLocal().pengaturan;

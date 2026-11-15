@@ -37,6 +37,7 @@ export default async function Seserahan() {
                 config={{
                   table: "seserahan_rekom", noun: "barang", primary: "nama", toggle: "dibeli", amount: "harga", link: "link",
                   groupBy: "kategori", defaults: { budget_tier: tier, dibeli: false }, csv: `seserahan-${tier}`, empty: "Belum ada barang.",
+                  bulk: { edit: ["dibeli"], add: { shared: ["kategori"], perRow: ["nama", "harga"], dupScope: ["budget_tier", "kategori"] } },
                 }} />
             </Section>
           );

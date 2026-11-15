@@ -1,10 +1,12 @@
 "use client";
 
-import { useId, useMemo, useOptimistic, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { FIELDS, type Field } from "@/lib/fields";
 import { angka, rp, rpSingkat, tgl } from "@/lib/format";
 import type { TableName } from "@/lib/types";
-import { createRow, deleteRow, updateRow } from "@/app/actions";
+import { createRow, createRows, deleteRow, deleteRows, updateRow, updateRows, type BatchResult } from "@/app/actions";
+import { canonSub as canonSubValue, subOptionsOf, type RowChange } from "@/lib/bulk";
+import { AddManySheet, BulkEditSheet, BulkToast, QuickFillSheet, SelectionBar, describeErrors, type BulkConfig, type ToastState } from "./bulk";
 import { FormSheet } from "./form-sheet";
 import { downloadCsv } from "./csv";
 import { MiniBar } from "./ui";
@@ -43,7 +45,14 @@ export interface ListConfig {
   strikeDone?: boolean;
   /** tombol salin baris ke tabel lain, mis. lagu rekomendasi -> daftar lagu */
   copy?: { label: string; done: string; table: TableName; map: Record<string, string>; existing?: string[] };
+  /** pilih beberapa, ubah/hapus massal, isi cepat, tambah banyak */
+  bulk?: BulkConfig;
 }
+
+type Opt =
+  | { type: "patch"; id: string; key: string; value: unknown }
+  | { type: "many"; changes: RowChange[] }
+  | { type: "remove"; ids: string[] };
 
 const BADGE: Record<string, string> = {
   LUNAS: "text-emerald",
@@ -71,27 +80,23 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
   const c = config;
   const fields = FIELDS[c.table];
   const byKey = useMemo(() => Object.fromEntries(fields.map((f) => [f.key, f])), [fields]);
-  const [optimistic, patch] = useOptimistic(rows, (state: R[], p: { id: string; key: string; value: unknown }) =>
-    state.map((r) => (r.id === p.id ? { ...r, [p.key]: p.value } : r)),
-  );
+  const [optimistic, applyOpt] = useOptimistic(rows, (state: R[], p: Opt) => {
+    if (p.type === "patch") return state.map((r) => (r.id === p.id ? { ...r, [p.key]: p.value } : r));
+    if (p.type === "remove") {
+      const gone = new Set(p.ids);
+      return state.filter((r) => !gone.has(r.id));
+    }
+    const m = new Map(p.changes.map((c) => [c.id, c.values]));
+    return state.map((r) => (m.has(r.id) ? { ...r, ...m.get(r.id) } : r));
+  });
 
   // Sub-kategori: pilihan di form diambil dari yang sudah ada, dan ejaan yang beda
   // huruf besar/kecil atau spasi dianggap sama (mengikuti ejaan pertama yang tercatat).
   const subKey = c.subGroupBy;
-  const subOptions = useMemo(() => {
-    if (!subKey) return [];
-    const seen = new Map<string, string>();
-    for (const r of optimistic) {
-      const s = String(r[subKey] ?? "").trim().replace(/\s+/g, " ");
-      if (s && !seen.has(s.toLowerCase())) seen.set(s.toLowerCase(), s);
-    }
-    return [...seen.values()];
-  }, [optimistic, subKey]);
+  const subOptions = useMemo(() => (subKey ? subOptionsOf(optimistic, subKey) : []), [optimistic, subKey]);
   const canonSub = (v: Record<string, unknown>) => {
     if (!subKey || typeof v[subKey] !== "string") return v;
-    const clean = (v[subKey] as string).trim().replace(/\s+/g, " ");
-    const hit = subOptions.find((o) => o.toLowerCase() === clean.toLowerCase());
-    return { ...v, [subKey]: hit ?? clean };
+    return { ...v, [subKey]: canonSubValue(v[subKey] as string, subOptions) };
   };
 
   const formFields = fields
@@ -104,8 +109,107 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
   const [editing, setEditing] = useState<R | "new" | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToastState] = useState<ToastState>(null);
+  const setToast = (text: string) => setToastState({ text, tone: "error" });
+  const closeToast = useCallback(() => setToastState(null), []);
   const uid = useId();
+
+  /* ---- pilih beberapa ---- */
+  const bulk = c.bulk;
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkSheet, setBulkSheet] = useState<null | { kind: "edit"; focus?: string } | { kind: "quick" } | { kind: "add" }>(null);
+  const [bulkPending, startBulk] = useTransition();
+  const stopSelecting = useCallback(() => {
+    setSelecting(false);
+    setSelected(new Set());
+  }, []);
+  // Escape keluar dari mode pilih (kalau tidak ada lembar yang terbuka; lembar menutup dirinya sendiri)
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) stopSelecting();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selecting, stopSelecting]);
+  // item yang sudah hilang (dihapus) tidak ikut terhitung
+  const selectedRows = optimistic.filter((r) => selected.has(r.id));
+  const flipOne = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const setMany = (ids: string[], on: boolean) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      for (const id of ids) {
+        if (on) n.add(id);
+        else n.delete(id);
+      }
+      return n;
+    });
+  const nameOf = (id?: string) => {
+    const r = optimistic.find((x) => x.id === id);
+    return r ? String(r[c.primary] ?? (c.primaryFallback ? r[c.primaryFallback] : "") ?? "item") : "item";
+  };
+
+  /** Jalankan aksi server di dalam transisi (supaya pembaruan optimistis bertahan) dan tunggu hasilnya. */
+  const inTransition = <T,>(fn: () => Promise<T>) =>
+    new Promise<T>((resolve, reject) => startBulk(async () => {
+      try {
+        resolve(await fn());
+      } catch (e) {
+        reject(e);
+      }
+    }));
+
+  /** Kirim perubahan massal (optimistis) + toast dengan Urungkan selama 8 detik. */
+  const applyChanges = async (changes: RowChange[], undo: RowChange[]): Promise<BatchResult> => {
+    const res = await inTransition(async () => {
+      applyOpt({ type: "many", changes });
+      return updateRows(c.table, changes);
+    });
+    const revert = (back: RowChange[]) => () => {
+      setToastState(null);
+      startBulk(async () => {
+        applyOpt({ type: "many", changes: back });
+        const r = await updateRows(c.table, back);
+        setToastState(r.ok
+          ? { text: `${r.count} item dikembalikan`, tone: "ok" }
+          : { text: r.message, tone: "error", details: describeErrors(r, (e) => nameOf(e.id)) });
+      });
+    };
+    if (res.ok) setToastState({ text: `${res.count} item diperbarui`, tone: "ok", undo: revert(undo) });
+    else if (res.doneIds?.length) {
+      const doneSet = new Set(res.doneIds);
+      setToastState({
+        text: res.message, tone: "error", details: describeErrors(res, (e) => nameOf(e.id)),
+        undo: revert(undo.filter((u) => doneSet.has(u.id))),
+      });
+    }
+    return res;
+  };
+
+  const removeSelected = async () => {
+    const ids = selectedRows.map((r) => r.id);
+    const res = await inTransition(async () => {
+      applyOpt({ type: "remove", ids });
+      return deleteRows(c.table, ids);
+    });
+    if (res.ok) {
+      setToastState({ text: `${res.count} item dihapus`, tone: "ok" });
+      stopSelecting();
+    } else setToastState({ text: res.message, tone: "error" });
+  };
+
+  const createMany = async (inputs: Record<string, unknown>[]): Promise<BatchResult> => {
+    const res = await inTransition(() => createRows(c.table, inputs));
+    if (res.ok) setToastState({ text: `${res.count} ${c.noun} ditambahkan`, tone: "ok" });
+    return res;
+  };
 
   const filterVal = (r: R) => {
     const v = r[c.filter!.key];
@@ -152,7 +256,7 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
 
   const toggle = (r: R, key: string, value: boolean) =>
     start(async () => {
-      patch({ id: r.id, key, value });
+      applyOpt({ type: "patch", id: r.id, key, value });
       const res = await updateRow(c.table, r.id, { [key]: value }, true);
       if (!res.ok) setToast(res.message);
     });
@@ -179,15 +283,23 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
     const link = c.link ? (r[c.link] as string | null) : null;
     const rawBadge = c.badge ? (r[c.badge] as string | null) : null;
     const badge = rawBadge && !c.quietBadge?.includes(rawBadge) ? rawBadge : null;
+    const isSel = selecting && selected.has(r.id);
+    const label = String(r[c.primary] ?? (c.primaryFallback ? r[c.primaryFallback] : "") ?? "");
     return (
-      <li key={r.id} className="flex items-start gap-1 border-b border-line-2 py-0.5 last:border-b-0">
-        {c.toggle && (
+      <li key={r.id} className="sel-row flex items-start gap-1 border-b border-line-2 py-0.5 last:border-b-0" data-selected={isSel || undefined}>
+        {selecting && (
+          <label className="-ml-3 grid size-11 flex-none cursor-pointer place-items-center">
+            <input type="checkbox" className="check" checked={isSel} aria-label={`Pilih ${label}`} onChange={() => flipOne(r.id)} />
+          </label>
+        )}
+        {c.toggle && !selecting && (
           <label className="-ml-3 grid size-11 flex-none cursor-pointer place-items-center">
             <input type="checkbox" className="check" checked={done} aria-label={`Tandai ${String(r[c.primary] ?? "")}`}
               onChange={(e) => toggle(r, c.toggle!, e.target.checked)} />
           </label>
         )}
-        <button type="button" className={`row-btn min-w-0 flex-1 py-2.5 text-left ${c.toggle ? "pr-1" : "-ml-1.5 px-1.5"}`} onClick={() => setEditing(r)}>
+        <button type="button" className={`row-btn min-w-0 flex-1 py-2.5 text-left ${c.toggle ? "pr-1" : "-ml-1.5 px-1.5"}`} onClick={() => (selecting ? flipOne(r.id) : setEditing(r))}
+          aria-pressed={selecting ? isSel : undefined}>
           <span className={`block leading-snug transition-colors duration-300 ${done && c.strikeDone ? "text-ink-3 line-through decoration-ink-3/60" : ""}`}>
             {fmt(byKey[c.primary], r[c.primary]) ||
               (c.primaryFallback && fmt(byKey[c.primaryFallback], r[c.primaryFallback])) || <em className="text-ink-3">belum diisi</em>}
@@ -199,7 +311,7 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
             </span>
           )}
         </button>
-        {c.toggles && (
+        {c.toggles && !selecting && (
           <span className="flex gap-1 pt-0.5">
             {c.toggles.map((t) =>
               r[t.key] === null ? (
@@ -214,7 +326,7 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
             )}
           </span>
         )}
-        {c.copy && (() => {
+        {c.copy && !selecting && (() => {
           const cp = c.copy;
           const sudah = cp.existing?.includes(String(r[c.primary] ?? "").toLowerCase());
           return sudah ? (
@@ -250,6 +362,15 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>Tambah {c.noun}</button>
+        {bulk?.add && (
+          <button type="button" className="btn" onClick={() => setBulkSheet({ kind: "add" })}>Tambah banyak</button>
+        )}
+        {bulk && optimistic.length > 0 && (
+          <button type="button" className="btn" aria-pressed={selecting} data-on={selecting || undefined}
+            onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>
+            {selecting ? "Selesai memilih" : "Pilih beberapa"}
+          </button>
+        )}
         {c.search && (
           <input className="input h-10 max-w-[14rem] flex-1" placeholder="Cari…" value={q} onChange={(e) => setQ(e.target.value)} aria-label={`Cari ${c.noun}`} />
         )}
@@ -300,8 +421,9 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
             }
             return (
               <div key={G.name} className="border-b border-line">
-                <h3>
-                  <button type="button" className="fold-head flex w-full items-center gap-3 py-2.5 text-left"
+                <h3 className="flex items-center">
+                  {selecting && <GroupCheck ids={G.subs.flatMap((x) => x.rows.map((r) => r.id))} selected={selected} onSet={setMany} label={`Pilih semua di ${G.name}`} />}
+                  <button type="button" className="fold-head flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
                     aria-expanded={isOpen} aria-controls={panel} onClick={() => flip(G.name)} disabled={forcedOpen}>
                     <svg aria-hidden viewBox="0 0 12 12" className="caret size-3 flex-none text-ink-2"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
                     <span className="min-w-0 flex-1">
@@ -321,7 +443,12 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
                     <div className="pb-3 pl-6">
                       {G.subs.map((S) => (
                         <div key={S.name}>
-                          {S.name && <p className="eyebrow mt-3 mb-0.5">{S.name}</p>}
+                          {S.name && (selecting ? (
+                            <div className="mt-2 flex items-center">
+                              <GroupCheck ids={S.rows.map((r) => r.id)} selected={selected} onSet={setMany} label={`Pilih semua di ${S.name}`} />
+                              <p className="eyebrow">{S.name}</p>
+                            </div>
+                          ) : <p className="eyebrow mt-3 mb-0.5">{S.name}</p>)}
                           <ul>{S.rows.map(renderRow)}</ul>
                         </div>
                       ))}
@@ -337,13 +464,21 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
           <div key={G.name} className={G.name ? "mt-6 first:mt-2" : ""}>
             {G.name && (
               <div className="flex items-baseline justify-between border-b border-ink pb-1.5">
-                <h3 className="display text-[1.35rem]">{G.name}</h3>
+                <h3 className="display flex items-center text-[1.35rem]">
+                  {selecting && <GroupCheck ids={G.subs.flatMap((x) => x.rows.map((r) => r.id))} selected={selected} onSet={setMany} label={`Pilih semua di ${G.name}`} />}
+                  {G.name}
+                </h3>
                 {c.total && c.amount && <span className="num text-[13px] text-ink-2">{rp(sum(G.subs.flatMap((x) => x.rows), c.amount))}</span>}
               </div>
             )}
             {G.subs.map((S) => (
               <div key={S.name}>
-                {S.name && <p className="eyebrow mt-4 mb-0.5">{S.name}</p>}
+                {S.name && (selecting ? (
+                  <div className="mt-3 flex items-center">
+                    <GroupCheck ids={S.rows.map((r) => r.id)} selected={selected} onSet={setMany} label={`Pilih semua di ${S.name}`} />
+                    <p className="eyebrow">{S.name}</p>
+                  </div>
+                ) : <p className="eyebrow mt-4 mb-0.5">{S.name}</p>)}
                 <ul>{S.rows.map(renderRow)}</ul>
               </div>
             ))}
@@ -373,16 +508,54 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
           onDelete={editing !== "new" ? () => deleteRow(c.table, editing.id) : undefined}
         />
       )}
-      {toast && (
-        <div role="status" className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-md border border-alert bg-sheet px-4 py-3 text-[14px] text-alert md:bottom-6">
-          {toast}
-          <button type="button" className="float-right text-ink-2 underline" onClick={() => setToast(null)}>tutup</button>
-        </div>
+      {selecting && <div aria-hidden className="h-32" />}
+      {selecting && bulk && (() => {
+        const visIds = visible.map((r) => r.id);
+        const allVis = visIds.length > 0 && visIds.every((id) => selected.has(id));
+        const editFields = bulk.edit.map((k) => byKey[k]).filter(Boolean);
+        const actions: { label: string; onClick: () => void; primary?: boolean }[] = [];
+        if (bulk.quick) actions.push({ label: "Isi cepat", onClick: () => setBulkSheet({ kind: "quick" }), primary: true });
+        for (const f of editFields.slice(0, 2))
+          actions.push({ label: `${f.type === "date" ? "Isi" : "Ubah"} ${f.label.toLowerCase()}…`, onClick: () => setBulkSheet({ kind: "edit", focus: f.key }) });
+        if (editFields.length > 2) actions.push({ label: "Ubah lainnya…", onClick: () => setBulkSheet({ kind: "edit" }) });
+        return (
+          <SelectionBar count={selectedRows.length} total={optimistic.length} visibleCount={visIds.length} allVisibleSelected={allVis}
+            onSelectVisible={() => setMany(visIds, !allVis)} actions={actions} onDelete={removeSelected} onCancel={stopSelecting} pending={bulkPending} />
+        );
+      })()}
+      {bulk && bulkSheet?.kind === "edit" && (
+        <BulkEditSheet fields={bulk.edit.map((k) => formFields.find((f) => f.key === k) ?? byKey[k]).filter(Boolean)} rows={selectedRows}
+          focusKey={bulkSheet.focus} quickHint={Boolean(bulk.quick)} onClose={() => setBulkSheet(null)} onApply={applyChanges} />
       )}
+      {bulk?.quick && bulkSheet?.kind === "quick" && (
+        <QuickFillSheet rows={[...visible.filter((r) => selected.has(r.id)), ...selectedRows.filter((r) => !visible.includes(r))]}
+          cfg={bulk.quick} statusOptions={byKey[bulk.quick.status]?.options ?? []} nameKey={c.primary}
+          onClose={() => setBulkSheet(null)} onApply={applyChanges} />
+      )}
+      {bulk?.add && bulkSheet?.kind === "add" && (
+        <AddManySheet cfg={bulk.add} fields={formFields} defaults={c.defaults ?? {}} existing={optimistic} subKey={subKey}
+          subOptions={subOptions} noun={c.noun} onClose={() => setBulkSheet(null)} onCreate={createMany} />
+      )}
+      {toast && <BulkToast toast={toast} onClose={closeToast} lifted={selecting} />}
     </section>
   );
 }
 
 function pickHidden(r: R, hide?: string[]) {
   return Object.fromEntries((hide ?? []).map((k) => [k, r[k]]));
+}
+
+/** Kotak centang "pilih semua" untuk grup/sub-grup; setengah tercentang kalau baru sebagian. */
+function GroupCheck({ ids, selected, onSet, label }: { ids: string[]; selected: Set<string>; onSet: (ids: string[], on: boolean) => void; label: string }) {
+  const n = ids.filter((id) => selected.has(id)).length;
+  const all = n > 0 && n === ids.length;
+  return (
+    <label className="-ml-3 grid size-11 flex-none cursor-pointer place-items-center" title={label}>
+      <input type="checkbox" className="check" checked={all} aria-label={label}
+        ref={(el) => {
+          if (el) el.indeterminate = n > 0 && !all;
+        }}
+        onChange={() => onSet(ids, !all)} />
+    </label>
+  );
 }

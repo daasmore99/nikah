@@ -45,6 +45,11 @@ export default async function Biaya() {
             filter: { key: "status", options: STATUS_BAYAR, nullAs: "BELUM BAYAR",
               labels: { "BELUM BAYAR": "Belum bayar", "SUDAH DP": "Sudah DP", "BELUM LUNAS": "Belum lunas", LUNAS: "Lunas" } },
             defaults: { grup: "Resepsi", status: "BELUM BAYAR" }, csv: "biaya", empty: "Belum ada item biaya.", total: true,
+            bulk: {
+              edit: ["status", "tanggal_bayar"],
+              quick: { amount: "realisasi", status: "status", date: "tanggal_bayar", estimate: "estimasi", done: "LUNAS" },
+              add: { shared: ["grup", "sub", "status"], perRow: ["nama", "estimasi", "realisasi"], dupScope: ["grup", "sub"], paste: true },
+            },
           }} />
         <p className="mt-3 text-[12.5px] text-ink-3">Angka di kanan: dibayar / estimasi. Ketuk kategori untuk membuka.</p>
       </Section>

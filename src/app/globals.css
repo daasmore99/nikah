@@ -460,6 +460,56 @@ dialog.sheet::backdrop {
   background: var(--hover);
 }
 
+/* ---------- input massal ---------- */
+/* tombol yang sedang aktif (mode pilih, LUNAS di isi cepat) */
+.btn[data-on] {
+  background: var(--emerald-tint);
+  border-color: var(--emerald);
+  color: var(--emerald);
+}
+.btn-danger-solid {
+  background: var(--alert);
+  border-color: var(--alert);
+  color: var(--paper);
+}
+.btn-danger-solid:hover {
+  background: #7f2e1a;
+  color: var(--paper);
+}
+/* baris terpilih: alas emerald tipis + garis kiri */
+.sel-row {
+  transition: background-color 0.18s, box-shadow 0.18s;
+}
+.sel-row[data-selected] {
+  background: var(--hover);
+  box-shadow: inset 2px 0 0 var(--emerald);
+}
+/* bilah aksi menempel di bawah: krem dalam, garis emerald di atas (sejiwa dengan menu HP) */
+.bulk-bar {
+  background: var(--menu);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--emerald);
+  border-radius: 3px;
+  box-shadow: 0 -6px 24px rgb(12 46 35 / 0.16);
+  animation: rise 0.28s var(--ease-out);
+}
+.bulk-toast {
+  box-shadow: 0 6px 20px rgb(12 46 35 / 0.14);
+  animation: rise 0.25s var(--ease-out);
+}
+.quick-row,
+.add-row {
+  transition: background-color 0.2s;
+}
+.quick-row[data-changed] {
+  background: rgb(13 74 55 / 0.04);
+}
+@media (min-width: 768px) {
+  dialog.sheet.sheet-wide {
+    max-width: 52rem;
+  }
+}
+
 }
 
 /* ---------- gerak ---------- */

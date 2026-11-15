@@ -53,6 +53,7 @@ export default async function Tamu() {
             table: "tamu", noun: "tamu", primary: "nama", secondary: ["relasi", "status_undangan", "jumlah_orang", "catatan"],
             badge: "konfirmasi", quietBadge: ["Belum konfirmasi"], filter: { key: "konfirmasi", options: [...KONFIRMASI] }, search: true,
             defaults: { status_undangan: "Belum diundang", konfirmasi: "Belum konfirmasi" }, csv: "tamu", empty: "Belum ada nama tamu.",
+            bulk: { edit: ["status_undangan", "konfirmasi", "relasi"], add: { shared: ["relasi", "status_undangan", "konfirmasi"], perRow: ["nama", "jumlah_orang"], dupScope: [] } },
           }} />
       </Section>
     </div>

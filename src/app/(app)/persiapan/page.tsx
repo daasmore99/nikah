@@ -52,6 +52,7 @@ export default async function Persiapan() {
             table: "todo", noun: "persiapan", primary: "judul", secondary: ["progres", "detail", "pic", "tenggat"],
             toggle: "selesai", strikeDone: true, groupBy: "bagian", collapse: "progress", search: true, hide: ["cpp_selesai", "cpw_selesai"],
             defaults: { bagian: "Persiapan lainnya", selesai: false, cpp_selesai: null, cpw_selesai: null }, csv: "persiapan", empty: "Belum ada persiapan.",
+            bulk: { edit: ["selesai", "pic", "bagian"], add: { shared: ["bagian", "pic"], perRow: ["judul", "tenggat"], dupScope: ["bagian"] } },
             fieldOptions: { bagian: perBagian.map((b) => b.nama) },
           }} />
         {admin.length > 0 && (

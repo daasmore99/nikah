@@ -19,6 +19,7 @@ export default async function Vendor() {
           table: "vendor", noun: "vendor", primary: "nama", secondary: ["kategori", "kontak", "telepon", "alamat", "catatan"],
           badge: "status", amount: "harga", link: "instagram_web", search: true,
           defaults: { status: "Kandidat" }, csv: "vendor", empty: "Belum ada vendor.",
+          bulk: { edit: ["status", "kategori"], add: { shared: ["kategori", "status"], perRow: ["nama", "harga", "telepon"], dupScope: ["kategori"] } },
         }} />
     </div>
   );
