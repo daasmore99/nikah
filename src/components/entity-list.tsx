@@ -71,13 +71,35 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
   const c = config;
   const fields = FIELDS[c.table];
   const byKey = useMemo(() => Object.fromEntries(fields.map((f) => [f.key, f])), [fields]);
-  const formFields = fields
-    .filter((f) => !c.hide?.includes(f.key))
-    .map((f) => (c.fieldOptions?.[f.key] ? { ...f, options: c.fieldOptions[f.key] } : f));
-
   const [optimistic, patch] = useOptimistic(rows, (state: R[], p: { id: string; key: string; value: unknown }) =>
     state.map((r) => (r.id === p.id ? { ...r, [p.key]: p.value } : r)),
   );
+
+  // Sub-kategori: pilihan di form diambil dari yang sudah ada, dan ejaan yang beda
+  // huruf besar/kecil atau spasi dianggap sama (mengikuti ejaan pertama yang tercatat).
+  const subKey = c.subGroupBy;
+  const subOptions = useMemo(() => {
+    if (!subKey) return [];
+    const seen = new Map<string, string>();
+    for (const r of optimistic) {
+      const s = String(r[subKey] ?? "").trim().replace(/\s+/g, " ");
+      if (s && !seen.has(s.toLowerCase())) seen.set(s.toLowerCase(), s);
+    }
+    return [...seen.values()];
+  }, [optimistic, subKey]);
+  const canonSub = (v: Record<string, unknown>) => {
+    if (!subKey || typeof v[subKey] !== "string") return v;
+    const clean = (v[subKey] as string).trim().replace(/\s+/g, " ");
+    const hit = subOptions.find((o) => o.toLowerCase() === clean.toLowerCase());
+    return { ...v, [subKey]: hit ?? clean };
+  };
+
+  const formFields = fields
+    .filter((f) => !c.hide?.includes(f.key))
+    .map((f) => {
+      if (f.key === subKey && subOptions.length) return { ...f, options: subOptions };
+      return c.fieldOptions?.[f.key] ? { ...f, options: c.fieldOptions[f.key] } : f;
+    });
   const [, start] = useTransition();
   const [editing, setEditing] = useState<R | "new" | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
@@ -102,10 +124,10 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
     const out: { name: string; subs: { name: string; rows: R[] }[] }[] = [];
     for (const r of visible) {
       const g = c.groupBy ? String(r[c.groupBy] ?? "Lainnya") : "";
-      const s = c.subGroupBy ? String(r[c.subGroupBy] ?? "") : "";
+      const s = c.subGroupBy ? String(r[c.subGroupBy] ?? "").trim().replace(/\s+/g, " ") : "";
       let G = out.find((x) => x.name === g);
       if (!G) out.push((G = { name: g, subs: [] }));
-      let S = G.subs.find((x) => x.name === s);
+      let S = G.subs.find((x) => x.name.toLowerCase() === s.toLowerCase());
       if (!S) G.subs.push((S = { name: s, rows: [] }));
       S.rows.push(r);
     }
@@ -345,8 +367,8 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
           meta={editing !== "new" ? meta(editing) : undefined}
           onSubmit={(v) =>
             editing === "new"
-              ? createRow(c.table, { ...c.defaults, ...v })
-              : updateRow(c.table, editing.id, { ...pickHidden(editing, c.hide), ...v })
+              ? createRow(c.table, { ...c.defaults, ...canonSub(v) })
+              : updateRow(c.table, editing.id, { ...pickHidden(editing, c.hide), ...canonSub(v) })
           }
           onDelete={editing !== "new" ? () => deleteRow(c.table, editing.id) : undefined}
         />
