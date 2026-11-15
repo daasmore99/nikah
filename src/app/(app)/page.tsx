@@ -15,17 +15,20 @@ export default async function Ringkasan() {
     repo.list("todo"), repo.list("tamu"), repo.list("tamu_kelompok"),
   ]);
   const today = todayJakarta();
-  const hari = daysBetween(today, p.tanggal_nikah);
+  const nikah = p.tanggal_nikah;
+  const hari = nikah ? daysBetween(today, nikah) : null;
+  const adaTarget = p.target_dana > 0;
   const dana = hitungDana(setoran, keluar);
   const sisa = Math.max(0, p.target_dana - dana.terkumpul);
   const seg = segmenTabungan(dana, p.target_dana);
-  const tb = targetBulanan(sisa, today, p.tanggal_nikah);
+  const tb = nikah ? targetBulanan(sisa, today, nikah) : null;
   const b = hitungBiaya(biaya);
   const td = hitungTodo(todo);
   const perkiraan = totalPerkiraanTamu(kelompok);
   const hadir = tamu.filter((t) => t.konfirmasi === "Hadir").length;
   const bulanAkhir = (() => {
-    const m = +p.tanggal_nikah.slice(5, 7) - 1;
+    if (!nikah) return "";
+    const m = +nikah.slice(5, 7) - 1;
     return bulanPanjang(m === 0 ? 12 : m);
   })();
   const next = todoBerikutnya(todo);
@@ -40,7 +43,17 @@ export default async function Ringkasan() {
       <section className="flex items-start justify-between gap-5 border-b border-line pb-8">
         <div className="min-w-0">
           <p className="eyebrow">{tglPanjang(p.tanggal_nikah)}</p>
-          {hari > 0 ? (
+          {hari === null ? (
+            <>
+              <h1 className="mt-3">
+                <span className="display block text-[6.2rem] leading-[0.8] tracking-[-0.03em] text-emerald/40 md:text-[10rem]">—</span>
+                <span className="display mt-2 block text-[1.9rem] italic md:text-[2.6rem]">hari lagi</span>
+              </h1>
+              <p className="mt-4 max-w-[30rem] text-[15px] text-ink-2">
+                Hitung mundur muncul setelah tanggal nikah diisi di <Link href="/pengaturan" className="link">Pengaturan</Link>.
+              </p>
+            </>
+          ) : hari > 0 ? (
             <>
               <h1 className="mt-3">
                 <span className="display block text-[6.2rem] leading-[0.8] tracking-[-0.03em] text-emerald md:text-[10rem]">
@@ -50,14 +63,14 @@ export default async function Ringkasan() {
               </h1>
               <p className="mt-4 max-w-[30rem] text-[15px] text-ink-2">
                 {hari >= 14 ? `Sekitar ${Math.round(hari / 7)} minggu. ` : ""}
-                {tb.bulan > 1 ? `${tb.bulan} kali gajian lagi.` : "Ini bulan terakhir."}
+                {tb && (tb.bulan > 1 ? `${tb.bulan} kali gajian lagi.` : "Ini bulan terakhir.")}
               </p>
             </>
           ) : (
             <h1 className="display mt-3 text-[4rem] text-emerald">{hari === 0 ? "Hari ini." : "Sudah sah."}</h1>
           )}
         </div>
-        <CouplePhoto a={p.nama_pria} b={p.nama_wanita} tanggal={p.tanggal_nikah} />
+        <CouplePhoto a={p.nama_pria} b={p.nama_wanita} tanggal={nikah} foto={repo.mode === "demo" ? null : "/foto-kami.jpg"} />
       </section>
 
       <div className="mt-6 grid gap-4 md:grid-cols-[1.25fr_1fr] md:gap-5">
@@ -73,7 +86,13 @@ export default async function Ringkasan() {
           <Reveal className="mt-4" delay={150}>
             <SavingsBar {...seg} target={p.target_dana} ambient />
           </Reveal>
-          {sisa > 0 ? (
+          {!adaTarget ? (
+            <p className="mt-4 text-[14px] text-ink-2">
+              Isi target dana di <Link href="/pengaturan" className="link">Pengaturan</Link>, lalu catat setoran di <Link href="/uang" className="link">Tabungan</Link>.
+            </p>
+          ) : sisa > 0 && !tb ? (
+            <p className="mt-4 text-[14px] text-ink-2">Isi tanggal nikah untuk menghitung setoran per bulan.</p>
+          ) : sisa > 0 && tb ? (
             <p className="mt-4 text-[15px]">
               Perlu <strong className="num font-medium text-emerald">{rp(tb.perBulan)}</strong> per bulan sampai {bulanAkhir}.
             </p>
@@ -104,7 +123,9 @@ export default async function Ringkasan() {
               ))}
             </ol>
           ) : (
-            <p className="mt-2 text-[14px] text-ink-2">Belum ada tagihan dengan nominal.</p>
+            <p className="mt-2 text-[14px] text-ink-2">
+              {biaya.length ? "Belum ada tagihan dengan nominal." : "Belum ada item biaya. Tagihan yang belum lunas muncul di sini."}
+            </p>
           )}
           <p className="mt-3 text-[13px] text-ink-2">
             {sisaDiketahui > 0 && <>Total sisa <span className="num">{rp(sisaDiketahui)}</span>. </>}
@@ -136,6 +157,10 @@ export default async function Ringkasan() {
               </p>
               <Reveal className="mt-2" delay={310}><Progress value={td.sudah} max={td.total} label="Progres persiapan" thin ambient /></Reveal>
             </>
+          ) : td.total === 0 ? (
+            <p className="mt-2 text-[14px] text-ink-2">
+              Belum ada daftar persiapan. Tambahkan tugas per tahap di <Link href="/persiapan" className="link">Persiapan</Link>.
+            </p>
           ) : (
             <p className="mt-2 text-emerald">Semua persiapan sudah beres.</p>
           )}

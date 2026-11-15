@@ -165,6 +165,16 @@ export async function updatePengaturan(input: Values): Promise<ActionResult> {
   });
 }
 
+/** Kosongkan semua data akun demo. Ditolak untuk akun data asli (dicek lagi di repo dan di database). */
+export async function resetDemo(konfirmasi: string): Promise<ActionResult> {
+  if (konfirmasi !== "RESET") return { ok: false, message: "Konfirmasi tidak cocok." };
+  return run(async () => {
+    const repo = await requireRepo();
+    if (repo.mode !== "demo") throw new RepoError("Reset hanya untuk akun demo.");
+    await repo.resetDemo();
+  });
+}
+
 /* ---------- auth ---------- */
 
 export async function signIn(_: unknown, form: FormData): Promise<{ message: string } | undefined> {

@@ -20,7 +20,8 @@ export default async function Uang() {
   const today = todayJakarta();
   const dana = hitungDana(setoran, keluar);
   const sisa = Math.max(0, p.target_dana - dana.terkumpul);
-  const tb = targetBulanan(sisa, today, p.tanggal_nikah);
+  const nikah = p.tanggal_nikah;
+  const tb = nikah ? targetBulanan(sisa, today, nikah) : null;
   const grafik = saldoBerjalan(setoran, keluar);
   const seg = segmenTabungan(dana, p.target_dana);
 
@@ -28,8 +29,8 @@ export default async function Uang() {
   const emas = pilihHarga(auto, p);
   const itemEmas = biaya.filter((b) => b.gram_emas && b.gram_emas > 0);
   const gram = itemEmas.reduce((a, b) => a + Number(b.gram_emas), 0);
-  const nm = { CPP: p.nama_pria, CPW: p.nama_wanita };
-  const mAkhir = +p.tanggal_nikah.slice(5, 7) - 1;
+  const nm = { CPP: p.nama_pria.trim() || "CPP (pria)", CPW: p.nama_wanita.trim() || "CPW (wanita)" };
+  const mAkhir = nikah ? +nikah.slice(5, 7) - 1 : 0;
   // penanda berikutnya (25/50/75/100%) yang belum tercapai
   const milestone = [25, 50, 75, 100]
     .map((pct) => ({ pct, kurang: Math.ceil((p.target_dana * pct) / 100) - dana.terkumpul }))
@@ -48,11 +49,15 @@ export default async function Uang() {
 
       <div className="mt-8 grid gap-10 md:grid-cols-[1.6fr_1fr]">
         <div>
-          <SavingsChart titik={grafik.titik} target={p.target_dana} today={today} nikah={p.tanggal_nikah} />
+          <SavingsChart titik={grafik.titik} target={p.target_dana} today={today} nikah={nikah} />
         </div>
         <div>
           <p className="eyebrow mb-2">Supaya sampai target</p>
-          {sisa > 0 ? (
+          {p.target_dana <= 0 ? (
+            <p className="text-[14px] text-ink-2">Isi target dana dan tanggal nikah di <a className="link" href="/pengaturan">Pengaturan</a> untuk melihat setoran per bulan.</p>
+          ) : sisa > 0 && !tb ? (
+            <p className="text-[14px] text-ink-2">Isi tanggal nikah di <a className="link" href="/pengaturan">Pengaturan</a> untuk menghitung setoran per bulan.</p>
+          ) : sisa > 0 && tb ? (
             <>
               <p className="num text-[2rem] leading-none text-emerald">{rp(tb.perBulan)}</p>
               <p className="mt-2 text-[14px] text-ink-2">

@@ -8,7 +8,8 @@ interface Props {
   titik: { tanggal: string; saldo: number }[];
   target: number;
   today: string;
-  nikah: string;
+  /** null: tanggal nikah belum diisi (akun demo) -> sumbu sampai sebulan setelah hari ini, tanpa jalur ke target */
+  nikah: string | null;
 }
 
 const t = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
@@ -31,12 +32,29 @@ export function SavingsChart({ titik, target, today, nikah }: Props) {
 
   const h = w < 500 ? 230 : 280;
   const pad = { l: 8, r: w < 500 ? 56 : 70, t: 22, b: 26 };
-  if (!titik.length) return <div ref={box} className="py-10 text-center text-ink-3">Belum ada setoran.</div>;
+  if (!titik.length)
+    return (
+      <div ref={box} className="relative grid h-[230px] place-items-center overflow-hidden border border-dashed border-emerald/35 bg-emerald-tint/40 px-6 text-center">
+        {/* sketsa garis tangga samar sebagai gambaran grafik */}
+        <svg aria-hidden viewBox="0 0 300 120" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 h-2/3 w-full opacity-25">
+          <path d="M0,110 H60 V90 H120 V72 H170 V60 H230 V38 H300" fill="none" stroke="var(--emerald)" strokeWidth="2" />
+          <line x1="0" x2="300" y1="20" y2="20" stroke="var(--brass)" strokeDasharray="3 5" />
+        </svg>
+        <div className="relative">
+          <p className="display text-[1.4rem]">Grafik saldo tabungan</p>
+          <p className="mt-1 max-w-[22rem] text-[13.5px] text-ink-2">
+            Garis saldo dari waktu ke waktu, garis target, dan jalur sampai hari H muncul setelah setoran pertama dicatat.
+          </p>
+        </div>
+      </div>
+    );
 
   const x0 = t(titik[0].tanggal);
-  const x1 = t(nikah);
-  const yMax = Math.max(target, ...titik.map((p) => p.saldo)) * 1.08;
-  const X = (ms: number) => pad.l + ((ms - x0) / (x1 - x0)) * (w - pad.l - pad.r);
+  const lastT = t(titik[titik.length - 1].tanggal);
+  // tanpa tanggal nikah: sumbu sampai sebulan setelah hari ini / setoran terakhir
+  const x1 = nikah ? t(nikah) : Math.max(t(today), lastT) + 30 * 86_400_000;
+  const yMax = Math.max(1, target, ...titik.map((p) => p.saldo)) * 1.08;
+  const X = (ms: number) => pad.l + ((ms - x0) / Math.max(1, x1 - x0)) * (w - pad.l - pad.r);
   const Y = (v: number) => pad.t + (1 - v / yMax) * (h - pad.t - pad.b);
 
   const last = titik[titik.length - 1];
@@ -55,7 +73,7 @@ export function SavingsChart({ titik, target, today, nikah }: Props) {
     if (ms >= x0) ticks.push({ x: X(ms), label: m === 1 ? String(y) : bulanPendek(m) });
   }
   const every = w < 500 ? 3 : 2;
-  const milestones = [25, 50, 75].map((pct) => {
+  const milestones = (target > 0 ? [25, 50, 75] : []).map((pct) => {
     const v = (target * pct) / 100;
     return { pct, v, at: titik.find((p) => p.saldo >= v)?.tanggal ?? null };
   });
@@ -97,15 +115,23 @@ export function SavingsChart({ titik, target, today, nikah }: Props) {
             );
           })}
           {/* target */}
-          <line x1={pad.l} x2={w - pad.r} y1={Y(target)} y2={Y(target)} stroke="var(--brass)" strokeDasharray="2 4" />
-          <text x={w - pad.r + 6} y={Y(target) + 4} fontSize="11.5" fill="var(--brass)" className="num">{rpSingkat(target)}</text>
-          <text x={w - pad.r - 2} y={Y(target) - 7} fontSize="11.5" fill="var(--brass)" textAnchor="end">target</text>
+          {target > 0 && (
+            <>
+              <line x1={pad.l} x2={w - pad.r} y1={Y(target)} y2={Y(target)} stroke="var(--brass)" strokeDasharray="2 4" />
+              <text x={w - pad.r + 6} y={Y(target) + 4} fontSize="11.5" fill="var(--brass)" className="num">{rpSingkat(target)}</text>
+              <text x={w - pad.r - 2} y={Y(target) - 7} fontSize="11.5" fill="var(--brass)" textAnchor="end">target</text>
+            </>
+          )}
           {/* hari ini & hari H */}
           <line x1={X(tNow)} x2={X(tNow)} y1={pad.t - 8} y2={Y(0)} stroke="var(--line)" strokeDasharray="1 3" />
           <text x={X(tNow)} y={pad.t - 11} fontSize="11" fill="var(--ink-3)" textAnchor="middle">hari ini</text>
           {/* jalur yang dibutuhkan */}
-          <line x1={X(tNow)} y1={Y(last.saldo)} x2={X(x1)} y2={Y(target)} stroke="var(--emerald-2)" strokeDasharray="5 4" strokeWidth="1.5" className="path-flow" />
-          <circle cx={X(x1)} cy={Y(target)} r="3.5" fill="var(--sheet)" stroke="var(--emerald-2)" strokeWidth="1.5" className="twinkle" />
+          {nikah && target > 0 && (
+            <>
+              <line x1={X(tNow)} y1={Y(last.saldo)} x2={X(x1)} y2={Y(target)} stroke="var(--emerald-2)" strokeDasharray="5 4" strokeWidth="1.5" className="path-flow" />
+              <circle cx={X(x1)} cy={Y(target)} r="3.5" fill="var(--sheet)" stroke="var(--emerald-2)" strokeWidth="1.5" className="twinkle" />
+            </>
+          )}
           {/* saldo */}
           <path d={`${d} V${Y(0)} H${X(t(titik[0].tanggal))} Z`} fill="var(--emerald)" opacity="0.07" className="fade-in" />
           <path d={d} fill="none" stroke="var(--emerald)" strokeWidth="2" strokeLinejoin="round" pathLength={1} className="line-draw" />

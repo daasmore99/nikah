@@ -7,7 +7,8 @@ const body = Instrument_Sans({ variable: "--font-body", subsets: ["latin"] });
 const mono = IBM_Plex_Mono({ variable: "--font-plex-mono", weight: ["400", "500"], subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Ananda & Zalfa", template: "%s · Ananda & Zalfa" },
+  // netral: nama mempelai diambil dari Pengaturan di layout halaman setelah login
+  title: { default: "Tracker Pernikahan", template: "%s · Tracker Pernikahan" },
   description: "Catatan persiapan dan uang pernikahan.",
   robots: { index: false, follow: false },
 };

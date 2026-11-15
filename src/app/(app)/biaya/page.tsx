@@ -32,7 +32,7 @@ export default async function Biaya() {
         <figcaption className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-[12.5px] text-ink-2">
           <span><span className="mr-1.5 inline-block h-2.5 w-2.5 bg-emerald align-middle" />dibayar {persen(b.realisasi, budget)}%</span>
           <span><span className="mr-1.5 inline-block h-2.5 w-2.5 bg-emerald-tint align-middle" />estimasi {persen(b.estimasi, budget)}%</span>
-          <span className="num">budget {rpSingkat(budget)}</span>
+          <span className="num">{budget > 0 ? `budget ${rpSingkat(budget)}` : "budget (target dana) belum diisi"}</span>
         </figcaption>
       </figure>
 

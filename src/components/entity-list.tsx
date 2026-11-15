@@ -390,7 +390,17 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
       )}
 
       {visible.length === 0 ? (
-        <p className="border-y border-line py-8 text-center text-ink-3">{rows.length === 0 ? c.empty : "Tidak ada yang cocok dengan filter ini."}</p>
+        rows.length === 0 ? (
+          <div className="border border-dashed border-emerald/35 bg-emerald-tint/40 px-5 py-7 text-center">
+            <p className="text-[15px] text-ink-2">{c.empty || `Belum ada ${c.noun}.`}</p>
+            <p className="mt-1 text-[13px] text-ink-3">
+              Pakai <strong className="font-medium text-emerald">Tambah {c.noun}</strong>
+              {bulk?.add ? <> atau <strong className="font-medium text-emerald">Tambah banyak</strong></> : null} di atas untuk mengisi.
+            </p>
+          </div>
+        ) : (
+          <p className="border-y border-line py-8 text-center text-ink-3">Tidak ada yang cocok dengan filter ini.</p>
+        )
       ) : c.collapse ? (
         <div className="border-t border-ink">
           {groups.map((G) => {

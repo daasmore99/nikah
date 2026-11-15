@@ -26,7 +26,8 @@ export function tgl(iso: string | null | undefined, opts: { tahun?: boolean } = 
 }
 
 /** "2027-04-10" -> "Sabtu, 10 April 2027" */
-export function tglPanjang(iso: string) {
+export function tglPanjang(iso: string | null | undefined) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return "Tanggal belum diisi";
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   const hari = HARI[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   return `${hari}, ${d} ${BULAN_PANJANG[m - 1]} ${y}`;

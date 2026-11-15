@@ -17,7 +17,8 @@ export interface Pengaturan {
   id: number;
   nama_pria: string;
   nama_wanita: string;
-  tanggal_nikah: string;
+  /** null hanya di akun demo yang belum mengisi tanggal */
+  tanggal_nikah: string | null;
   target_dana: number;
   harga_emas_manual: number | null;
   harga_emas_manual_tgl: string | null;

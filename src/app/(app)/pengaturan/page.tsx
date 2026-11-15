@@ -4,6 +4,7 @@ import { PENGATURAN_FIELDS } from "@/lib/fields";
 import { rp, tgl } from "@/lib/format";
 import { PageHead, Section } from "@/components/ui";
 import { SettingsForm } from "@/components/settings-form";
+import { ResetDemo } from "@/components/reset-demo";
 import { signOut } from "../../actions";
 
 export const metadata: Metadata = { title: "Pengaturan" };
@@ -36,6 +37,15 @@ export default async function Pengaturan() {
       <Section title="Souvenir">
         <SettingsForm fields={pick(["souvenir_harga_satuan", "souvenir_jumlah", "souvenir_budget", "souvenir_blindbox", "souvenir_sisa_umma", "souvenir_kurang"])} initial={init} />
       </Section>
+
+      {repo.mode === "demo" && (
+        <Section title="Data demo" id="reset-demo">
+          <p className="-mt-1 mb-4 max-w-[38rem] text-[14px] text-ink-2">
+            Akun ini memakai penyimpanan terpisah dari data asli. Isi apa saja untuk mencoba fitur, lalu kosongkan lagi di sini.
+          </p>
+          <ResetDemo />
+        </Section>
+      )}
 
       <Section title="Akun">
         <p className="text-[14px] text-ink-2">Masuk sebagai <strong className="font-medium text-ink">{repo.user.nama}</strong>{repo.user.email && ` (${repo.user.email})`}.</p>

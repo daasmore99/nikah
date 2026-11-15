@@ -13,7 +13,8 @@ src/app/(app)/        halaman setelah login: ringkasan, uang, biaya, persiapan, 
 src/app/login/        halaman masuk (email + kata sandi)
 src/app/actions.ts    server actions: tambah/ubah/hapus + validasi + login/keluar
 src/proxy.ts          refresh sesi Supabase, arahkan tamu ke /login
-src/lib/repo.ts       akses data (Supabase, atau file lokal untuk mencoba)
+src/lib/repo.ts       akses data (Supabase, atau file lokal untuk mencoba); akun demo -> skema demo
+src/lib/demo.ts       aturan akun demo (anggota -> data asli, penonton -> demo)
 src/lib/fields.ts     definisi kolom tiap tabel (form + validasi server)
 src/lib/calc.ts       hitungan: dana terkumpul, target bulanan, biaya, countdown
 src/lib/gold.ts       harga emas otomatis + cadangan
@@ -21,6 +22,7 @@ src/lib/import/       parser CSV sheet + pembanding total
 scripts/import-sheet.ts  impor sheet -> data/import.json + supabase/seed.local.sql
 supabase/migrations/  skema SQL + RLS
 tests/import.test.ts  tes impor: angka hasil impor vs total di sheet
+tests/demo.test.ts    tes akun demo: penyimpanan per jenis akun, data asli tidak tersentuh
 ```
 
 `data/`, `.local-data/`, `supabase/seed.local.sql` dan `.env*` ada di `.gitignore` karena berisi data pribadi.
@@ -38,7 +40,10 @@ npm run dev             # http://localhost:3000
 Mode lokal tidak pakai login dan menyimpan perubahan di `.local-data/db.json`. Hapus file itu untuk mulai ulang dari data sheet.
 Mode ini mati otomatis di production dan kalau env Supabase terisi.
 
-Cek semuanya sekaligus: `npm run check` (typecheck, lint, tes impor, build).
+Coba sebagai akun demo di laptop: tambahkan `LOCAL_DEMO=1` di `.env.local` (di samping `LOCAL_MODE=1`), restart `npm run dev`.
+Data demo disimpan di `.local-data/demo.json` yang mulai kosong; `db.json` tidak dibaca dan tidak diubah.
+
+Cek semuanya sekaligus: `npm run check` (typecheck, lint, tes impor + tes demo, build).
 
 ## Pasang sungguhan (dikerjakan sendiri)
 
@@ -62,6 +67,24 @@ Cek semuanya sekaligus: `npm run check` (typecheck, lint, tes impor, build).
 
 Semua tabel memakai Row Level Security: hanya user ter-login yang emailnya ada di `anggota` yang bisa baca/tulis.
 Kolom `created_by` / `updated_by` terisi otomatis dari akun yang menginput.
+
+### 1b. Akun demo (opsional)
+
+Akun ketiga untuk melihat-lihat dan mencoba semua fitur. Bisa tambah/ubah/hapus, tapi datanya di skema
+Postgres terpisah `demo` yang mulai kosong (tanpa nama mempelai, tanggal, atau angka). Akun demo tidak pernah
+membaca atau menulis data asli, dan foto `public/foto-kami.jpg` tidak ditampilkan untuknya.
+
+1. **SQL Editor** → tempel isi `supabase/migrations/20261115000000_demo.sql` → Run (aman diulang).
+2. **Project Settings → API (Data API) → Exposed schemas**: tambahkan `demo` → Save.
+3. Daftarkan email demo (SQL Editor). **Jangan** masukkan email ini ke `anggota`:
+   ```sql
+   insert into public.penonton (email) values ('email-demo@contoh.com');
+   ```
+4. **Authentication → Users → Add user → Create new user**: email yang sama, centang *Auto Confirm User*, isi kata sandi.
+5. Tidak perlu env tambahan atau redeploy: siapa akun demo ditentukan tabel `penonton`.
+
+Isi demo bisa dikosongkan lagi di **Pengaturan → Data demo → Reset data demo** (konfirmasi dua langkah).
+Semua akun di `penonton` berbagi satu data demo yang sama.
 
 ### 2. Vercel
 
