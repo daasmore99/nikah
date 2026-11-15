@@ -1,9 +1,12 @@
 import type { Field } from "./fields";
+import { normalizeHttpUrl } from "./security/url";
 
 export type Values = Record<string, unknown>;
 export type Result = { ok: true; data: Values } | { ok: false; errors: Record<string, string> };
 
 const MAX_UANG = 10_000_000_000; // Rp10 M, batas wajar
+export const MAX_TEKS = 2000;
+const MAX_DESIMAL = 1_000_000;
 
 /**
  * Validasi + normalisasi input form sesuai definisi Field.
@@ -12,6 +15,8 @@ const MAX_UANG = 10_000_000_000; // Rp10 M, batas wajar
 export function validate(fields: Field[], input: Values, partial = false): Result {
   const data: Values = {};
   const errors: Record<string, string> = {};
+  // Server Action bisa dipanggil langsung dengan argumen apa pun: bukan objek = ditolak, bukan crash
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, errors: { _: "Isian tidak valid" } };
   for (const f of fields) {
     if (partial && !(f.key in input)) continue;
     const raw = input[f.key];
@@ -42,6 +47,7 @@ export function validate(fields: Field[], input: Values, partial = false): Resul
       case "decimal": {
         const n = Number(s.replace(",", "."));
         if (!Number.isFinite(n) || n < 0) errors[f.key] = `${f.label} harus angka`;
+        else if (n > MAX_DESIMAL) errors[f.key] = `${f.label} terlalu besar`;
         else data[f.key] = Math.round(n * 1000) / 1000;
         break;
       }
@@ -53,12 +59,15 @@ export function validate(fields: Field[], input: Values, partial = false): Resul
         if (f.options && !f.options.includes(s)) errors[f.key] = `${f.label} tidak dikenal`;
         else data[f.key] = s;
         break;
-      case "url":
-        if (!/^https?:\/\/\S+$/i.test(s) && !/^[\w.-]+\.[a-z]{2,}(\/\S*)?$/i.test(s)) errors[f.key] = `${f.label} bukan link yang valid`;
-        else data[f.key] = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+      case "url": {
+        // hanya http/https; javascript:, data:, vbscript:, dll. ditolak (lihat security/url.ts)
+        const u = normalizeHttpUrl(s);
+        if (!u) errors[f.key] = `${f.label} bukan link yang valid`;
+        else data[f.key] = u;
         break;
+      }
       default:
-        if (s.length > 2000) errors[f.key] = `${f.label} terlalu panjang`;
+        if (s.length > MAX_TEKS) errors[f.key] = `${f.label} terlalu panjang`;
         else data[f.key] = s;
     }
   }

@@ -10,13 +10,32 @@ import { syncDemoWsCookie } from "@/lib/demo-ws";
 import { TABLE_NAMES, type TableName } from "@/lib/types";
 import { validate, type Values } from "@/lib/validate";
 import { MAX_CREATE, MAX_IDS, type RowChange } from "@/lib/bulk";
+import { demoWriteWait, loginGuard } from "@/lib/security/limiter";
+import { pesanTunggu } from "@/lib/security/ratelimit";
+import { HONEYPOT_FIELD, seragamkanWaktu } from "@/lib/security/login";
+import { safeNextPath } from "@/lib/security/url";
 
 export type ActionResult = { ok: true } | { ok: false; message: string; errors?: Record<string, string> };
 
 function assertTable(t: string): asserts t is TableName {
   if (!TABLE_NAMES.includes(t as TableName)) throw new RepoError("Tabel tidak dikenal");
 }
-const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
+const isUuid = (id: unknown): id is string =>
+  typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+/**
+ * Repo untuk aksi TULIS. Semua aksi tulis wajib lewat sini: sesi sah (requireRepo -> redirect /login),
+ * dan akun demo dibatasi lajunya per IP supaya kredensial demo yang dibagikan tidak bisa dipakai
+ * membanjiri database.
+ */
+async function writeRepo() {
+  const repo = await requireRepo();
+  if (repo.mode === "demo") {
+    const tunggu = await demoWriteWait();
+    if (tunggu > 0) throw new RepoError(pesanTunggu(tunggu, "perubahan dari akun demo"));
+  }
+  return repo;
+}
 
 async function run(fn: () => Promise<void>): Promise<ActionResult> {
   try {
@@ -36,7 +55,7 @@ export async function createRow(table: string, input: Values): Promise<ActionRes
   const v = validate(FIELDS[table], input);
   if (!v.ok) return { ok: false, message: "Cek lagi isian yang ditandai.", errors: v.errors };
   return run(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     await repo.insert(table, { ...v.data, urutan: Math.floor(Date.now() / 1000) });
   });
 }
@@ -47,7 +66,7 @@ export async function updateRow(table: string, id: string, input: Values, partia
   const v = validate(FIELDS[table], input, partial);
   if (!v.ok) return { ok: false, message: "Cek lagi isian yang ditandai.", errors: v.errors };
   return run(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     await repo.update(table, id, v.data);
   });
 }
@@ -56,7 +75,7 @@ export async function deleteRow(table: string, id: string): Promise<ActionResult
   assertTable(table);
   if (!isUuid(id)) return { ok: false, message: "ID tidak valid" };
   return run(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     await repo.remove(table, id);
   });
 }
@@ -99,7 +118,7 @@ export async function createRows(table: string, inputs: Values[]): Promise<Batch
   });
   if (rowErrors.length) return { ok: false, message: `${rowErrors.length} baris perlu dicek. Belum ada yang disimpan.`, rowErrors };
   return runBatch(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     await repo.insertMany(table, rows);
     return { ok: true, count: rows.length };
   });
@@ -128,7 +147,7 @@ export async function updateRows(table: string, changes: { id: string; values: V
   if (rowErrors.length) return { ok: false, message: `${rowErrors.length} baris perlu dicek. Belum ada yang diubah.`, rowErrors };
   if (!clean.length) return { ok: true, count: 0 };
   return runBatch(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     const out = await repo.updateMany(table, clean);
     if (!out.failed.length) return { ok: true, count: out.done.length };
     const index = new Map(changes.map((c, i) => [c.id, i]));
@@ -151,7 +170,7 @@ export async function deleteRows(table: string, ids: string[]): Promise<BatchRes
   if (!ids.every((id) => typeof id === "string" && isUuid(id))) return { ok: false, message: "ID tidak valid" };
   const unique = [...new Set(ids)];
   return runBatch(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     const n = await repo.removeMany(table, unique);
     return { ok: true, count: n };
   });
@@ -161,7 +180,7 @@ export async function updatePengaturan(input: Values): Promise<ActionResult> {
   const v = validate(PENGATURAN_FIELDS, input, true);
   if (!v.ok) return { ok: false, message: "Cek lagi isian yang ditandai.", errors: v.errors };
   return run(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     await repo.updatePengaturan(v.data);
   });
 }
@@ -170,7 +189,7 @@ export async function updatePengaturan(input: Values): Promise<ActionResult> {
 export async function resetDemo(konfirmasi: string): Promise<ActionResult> {
   if (konfirmasi !== "RESET") return { ok: false, message: "Konfirmasi tidak cocok." };
   return run(async () => {
-    const repo = await requireRepo();
+    const repo = await writeRepo();
     if (repo.mode !== "demo") throw new RepoError("Reset hanya untuk akun demo.");
     await repo.resetDemo();
   });
@@ -178,18 +197,49 @@ export async function resetDemo(konfirmasi: string): Promise<ActionResult> {
 
 /* ---------- auth ---------- */
 
+const LOGIN_GAGAL = "Email atau kata sandi salah.";
+
+/**
+ * Login. Perlindungan: rate limit per IP, per email+IP, dan per email (jeda sementara yang
+ * membesar, tidak pernah kunci permanen); field jebakan (honeypot) untuk bot; pesan gagal yang
+ * sama untuk semua sebab (tidak membocorkan apakah email terdaftar); waktu respons gagal diseragamkan.
+ */
 export async function signIn(_: unknown, form: FormData): Promise<{ message: string } | undefined> {
   if (!supabaseConfigured) return { message: "Supabase belum dikonfigurasi." };
+  const mulai = Date.now();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
+  const jebakan = String(form.get(HONEYPOT_FIELD) ?? "");
+  const tujuan = safeNextPath(form.get("next"));
   if (!email || !password) return { message: "Isi email dan kata sandi." };
+
+  const guard = await loginGuard(email.slice(0, 320));
+  const tunggu = await guard.check();
+  if (tunggu > 0) {
+    await seragamkanWaktu(mulai);
+    return { message: pesanTunggu(tunggu) };
+  }
+  // bot (field tersembunyi terisi) atau isian tidak wajar: dihitung gagal, tanpa memanggil Supabase
+  if (jebakan || email.length > 254 || password.length > 256 || !/^[^\s@]+@[^\s@]+$/.test(email)) {
+    await guard.fail();
+    await seragamkanWaktu(mulai);
+    return { message: LOGIN_GAGAL };
+  }
+
   const sb = await createClient();
   const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) return { message: "Email atau kata sandi salah." };
+  if (error) {
+    await guard.fail();
+    await seragamkanWaktu(mulai);
+    // 429 dari Supabase Auth: batas bawaan Supabase, bukan salah sandi
+    if (error.status === 429) return { message: pesanTunggu(15 * 60) };
+    return { message: LOGIN_GAGAL };
+  }
+  await guard.success(sb);
   // akun demo: pastikan browser ini punya ruang demo (cookie demo_ws); akun asli: buang cookie demo
   const { data: penonton } = await sb.rpc("is_penonton");
   await syncDemoWsCookie(penonton === true);
-  redirect("/");
+  redirect(tujuan);
 }
 
 export async function signOut() {

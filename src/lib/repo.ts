@@ -5,7 +5,9 @@ import { connection } from "next/server";
 import { localDemo, localMode, supabaseConfigured } from "./env";
 import { createClient } from "./supabase/server";
 import { groupSameValues } from "./bulk";
-import { DEMO_BATAS, DEMO_BELUM_SIAP, demoHeaders, isDemoLimit, isDemoSchemaOld, resolveStore, tableFor } from "./demo";
+import { DEMO_BELUM_SIAP, demoHeaders, demoLimitMessage, isDemoLimit, isDemoSchemaOld, resolveStore, tableFor } from "./demo";
+import { demoNewWsWait } from "./security/limiter";
+import { pesanTunggu } from "./security/ratelimit";
 import { demoTemplateRows } from "./demo-template";
 import { demoWs } from "./demo-ws";
 import { todayJakarta } from "./calc";
@@ -15,6 +17,15 @@ import type { Pengaturan } from "./types";
 
 export { RepoError };
 export type { BatchOutcome, Repo, User, StoreMode } from "./repo-types";
+
+/** Pesan aman untuk error database: tanpa nama tabel/kolom/constraint. */
+function pesanDb(op: string, e: { code?: string }): string {
+  if (e.code === "42501" || e.code === "PGRST301") return `${op} gagal: tidak ada akses.`;
+  if (e.code === "23505") return `${op} gagal: data yang sama sudah ada.`;
+  if (e.code === "23514" || e.code === "23502" || e.code === "22P02" || e.code === "22001") return `${op} gagal: isian tidak memenuhi aturan.`;
+  if (e.code === "23503") return `${op} gagal: data terkait tidak ditemukan.`;
+  return `${op} gagal. Coba lagi sebentar.`;
+}
 
 /* ---------------- Supabase ---------------- */
 
@@ -45,9 +56,11 @@ async function supabaseRepo(): Promise<Repo | null> {
   // Tidak ada fallback ke tabel asli: kalau demo_* belum ada, akun demo mendapat error yang jelas.
   const fail = (op: string, e: { code?: string; message: string } | null) => {
     if (!e) return;
-    if (mode === "demo" && isDemoLimit(e)) throw new RepoError(DEMO_BATAS);
+    if (mode === "demo" && isDemoLimit(e)) throw new RepoError(demoLimitMessage(e));
     if (mode === "demo" && isDemoSchemaOld(e)) throw new RepoError(DEMO_BELUM_SIAP);
-    throw new RepoError(`${op} gagal: ${e.message}`);
+    // detail Postgres (nama tabel/constraint) hanya ke log server, klien mendapat pesan ramah
+    console.error(`[repo] ${op} gagal`, e.code, e.message);
+    throw new RepoError(pesanDb(op, e));
   };
   const repo: Repo = {
     user: { id: claims.sub, email, nama: email.split("@")[0] },
@@ -79,7 +92,9 @@ async function supabaseRepo(): Promise<Repo | null> {
       for (const g of groupSameValues(changes)) {
         const { data, error } = await db.from(tableFor(mode, table)).update(g.values).in("id", g.ids).select("id");
         if (error) {
-          for (const id of g.ids) out.failed.push({ id, message: `Mengubah gagal: ${error.message}` });
+          console.error("[repo] Mengubah gagal", error.code, error.message);
+          const msg = mode === "demo" && isDemoLimit(error) ? demoLimitMessage(error) : pesanDb("Mengubah", error);
+          for (const id of g.ids) out.failed.push({ id, message: msg });
           continue;
         }
         const ok = new Set((data ?? []).map((r: { id: string }) => r.id));
@@ -145,6 +160,9 @@ async function supabaseRepo(): Promise<Repo | null> {
     const ada = await db.from(tableFor(mode, "pengaturan")).select("id").limit(1);
     fail("Memuat pengaturan", ada.error);
     if (ada.data?.length) return;
+    // ruang baru dibatasi per IP (cegah pembuatan ruang massal yang menghabiskan kuota database)
+    const tunggu = await demoNewWsWait();
+    if (tunggu > 0) throw new RepoError(pesanTunggu(tunggu, "ruang demo baru dari jaringan ini"));
     const baru = await db
       .from(tableFor(mode, "pengaturan"))
       .upsert({ nama_pria: "", nama_wanita: "", tanggal_nikah: null, target_dana: 0 }, { onConflict: "ws", ignoreDuplicates: true })

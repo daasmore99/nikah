@@ -121,6 +121,20 @@ tidak lewat API): `select public.purge_demo();` menghapus ruang yang tidak diuba
 `select public.purge_demo('7 days');`). Opsional, kalau extension `pg_cron` aktif, jadwalkan harian:
 `select cron.schedule('purge-demo', '17 3 * * *', $c$select public.purge_demo()$c$);`
 
+### 1c. Pengerasan keamanan (disarankan)
+
+Jalankan `supabase/migrations/20261117000000_ratelimit.sql` di SQL Editor, 4 bagian berurutan (idempoten):
+- BAGIAN 1: rate limit login & akun demo (tabel `rl_bucket` tertutup + fungsi `rl_check`, `rl_hit`, `rl_clear_login`)
+- BAGIAN 2: penguncian fungsi (search_path, cabut EXECUTE dari `anon`), tutup akses skema `demo` lama
+- BAGIAN 3: kuota demo (ruang harus terdaftar, baris maks. 3 KB, maks. 8000 baris per tabel, maks. 400 ruang)
+- BAGIAN 4: pemeriksaan (hanya SELECT): 4a dan 4b harus kosong
+
+Sebelum migrasi ini dijalankan aplikasi tetap jalan; rate limit memakai memori per instance (perlindungan sebagian).
+Detail dan langkah manual lain: `SECURITY.md`.
+
+Darurat saja: env `SECURITY_RELAXED=1` di Vercel mematikan CSP dan rate limit aplikasi (redeploy). Hapus lagi
+setelah masalah ketemu.
+
 ### 2. Vercel
 
 1. Push folder ini ke repo GitHub **private**.

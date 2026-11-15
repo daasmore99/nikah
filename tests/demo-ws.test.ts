@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   DATA_TABLES, DEMO_BATAS, DEMO_BATAS_BARIS, DEMO_WS_COOKIE, DEMO_WS_HEADER, demoHeaders, demoWsCookieOptions,
   isDemoLimit, isDemoSchemaOld, isDemoWs, localFileFor, newDemoWs, wsCookieAction,
+  demoLimitMessage, DEMO_PENUH, DEMO_TERLALU_PANJANG,
 } from "../src/lib/demo";
 import { localRepo } from "../src/lib/local-store";
 import { demoTemplate, demoTemplateRows } from "../src/lib/demo-template";
@@ -89,7 +90,7 @@ test("kode: header & cookie demo hanya di cabang demo", () => {
   assert.match(repo, /if \(mode === "demo"\) await siapkanRuang\(\);/);
   assert.match(repo, /onConflict: "ws", ignoreDuplicates: true/);
   // limit -> pesan ramah
-  assert.match(repo, /isDemoLimit\(e\)\) throw new RepoError\(DEMO_BATAS\)/);
+  assert.match(repo, /isDemoLimit\(e\)\) throw new RepoError\(demoLimitMessage\(e\)\)/);
 
   const server = readFileSync(root("src", "lib", "supabase", "server.ts"), "utf8");
   assert.match(server, /export async function createClient\(headers\?: Record<string, string>\)/);
@@ -108,6 +109,10 @@ test("pesan error demo: batas & skema lama dikenali", () => {
   assert.equal(isDemoLimit({ code: "P0001", message: "Batas data demo tercapai" }), true);
   assert.equal(isDemoLimit({ code: "42501", message: "x" }), false);
   assert.match(DEMO_BATAS, /500/);
+  assert.equal(demoLimitMessage({ message: "Batas data demo tercapai" }), DEMO_BATAS);
+  assert.equal(demoLimitMessage({ message: "Kuota demo penuh" }), DEMO_PENUH);
+  assert.equal(demoLimitMessage({ message: "Isian demo terlalu panjang" }), DEMO_TERLALU_PANJANG);
+  assert.equal(isDemoLimit({ code: "P0001", message: "Kuota demo penuh" }), true);
   assert.equal(isDemoSchemaOld({ code: "42703", message: 'column "ws" does not exist' }), true);
   assert.equal(isDemoSchemaOld({ code: "42P10", message: "no unique or exclusion constraint" }), true);
   assert.equal(isDemoSchemaOld({ code: "23505", message: "dup" }), false);

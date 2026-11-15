@@ -107,7 +107,19 @@ export const DEMO_BATAS =
 
 export function isDemoLimit(e: { code?: string | null; message?: string | null } | null | undefined) {
   if (!e) return false;
-  return e.code === "54000" || /Batas data demo tercapai/.test(e.message ?? "");
+  return e.code === "54000" || /Batas data demo tercapai|Kuota demo penuh|Isian demo terlalu panjang/.test(e.message ?? "");
+}
+
+/** Kuota global akun demo penuh (trigger demo_batas_ws, migrasi 20261117000000). */
+export const DEMO_PENUH = "Kuota akun demo sedang penuh. Coba lagi nanti.";
+export const DEMO_TERLALU_PANJANG = "Isian terlalu panjang untuk akun demo. Persingkat teksnya.";
+
+/** Pesan ramah yang cocok untuk tiap jenis batas demo (semua errcode 54000). */
+export function demoLimitMessage(e: { message?: string | null } | null | undefined): string {
+  const m = e?.message ?? "";
+  if (/Kuota demo penuh/.test(m)) return DEMO_PENUH;
+  if (/terlalu panjang/.test(m)) return DEMO_TERLALU_PANJANG;
+  return DEMO_BATAS;
 }
 
 /** Kolom ws / PK pengaturan per ruang belum ada = migrasi demo_workspace belum dijalankan. */

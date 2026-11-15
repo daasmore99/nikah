@@ -9,6 +9,7 @@ import { canonSub as canonSubValue, subOptionsOf, type RowChange } from "@/lib/b
 import { AddManySheet, BulkEditSheet, BulkToast, QuickFillSheet, SelectionBar, describeErrors, type BulkConfig, type ToastState } from "./bulk";
 import { FormSheet } from "./form-sheet";
 import { downloadCsv } from "./csv";
+import { safeHref } from "@/lib/security/url";
 import { MiniBar } from "./ui";
 
 type R = Record<string, unknown> & { id: string };
@@ -280,7 +281,8 @@ export function EntityList({ config, rows, profil }: { config: ListConfig; rows:
       })
       .filter(Boolean)
       .join(" · ");
-    const link = c.link ? (r[c.link] as string | null) : null;
+    // hanya http/https yang menjadi href (data lama/impor dengan javascript:, data:, dll. tidak ditampilkan)
+    const link = c.link ? safeHref(r[c.link]) : null;
     const rawBadge = c.badge ? (r[c.badge] as string | null) : null;
     const badge = rawBadge && !c.quietBadge?.includes(rawBadge) ? rawBadge : null;
     const isSel = selecting && selected.has(r.id);

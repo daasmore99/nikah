@@ -45,3 +45,14 @@ next-env.d.ts
 /data/
 /.local-data/
 /supabase/seed.local.sql
+*.local.sql
+*.dump
+*.backup
+/backup/
+# foto asli / mentah (yang dipakai web hanya public/foto-kami.jpg, versi kecil)
+/foto-asli/
+/private/
+*.heic
+*.HEIC
+*.raw
+*.dng
