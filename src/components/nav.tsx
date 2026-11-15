@@ -5,31 +5,20 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export const NAV = [
-  { href: "/", label: "Ringkasan", short: "Ringkas",
-    desc: "Satu layar untuk hitung mundur ke hari H, posisi tabungan, tagihan terdekat, persiapan berikutnya, dan jumlah tamu." },
-  { href: "/uang", label: "Tabungan", short: "Tabungan",
-    desc: "Catat setoran tiap pihak dan pengeluaran bareng; grafik menunjukkan saldo dan berapa yang perlu ditabung per bulan." },
-  { href: "/biaya", label: "Biaya", short: "Biaya",
-    desc: "Daftar biaya per kategori (lamaran, mahar, resepsi, …) dengan estimasi, DP, status bayar, dan tanggal pelunasan." },
-  { href: "/persiapan", label: "Persiapan", short: "Persiapan",
-    desc: "Daftar tugas per tahap yang bisa dicentang, lengkap dengan tenggat, PIC, dan progres tiap tahap." },
-  { href: "/tamu", label: "Tamu & RSVP",
-    desc: "Perkiraan tamu per kelompok dan daftar nama dengan status undangan dan konfirmasi hadir." },
-  { href: "/seserahan", label: "Seserahan",
-    desc: "Daftar barang seserahan per budget dan kategori; centang yang sudah dibeli." },
-  { href: "/vendor", label: "Vendor",
-    desc: "Kontak, harga, dan status vendor (kandidat atau dipilih) supaya tidak tercecer di chat." },
-  { href: "/undangan", label: "Undangan & souvenir",
-    desc: "Kalkulator souvenir (harga × jumlah vs budget) dan katalog pilihan undangan cetak, digital, dan souvenir." },
-  { href: "/lagu", label: "Lagu",
-    desc: "Daftar putar acara untuk band atau operator musik, plus rekomendasi lagu yang bisa langsung dipakai." },
-  { href: "/pengaturan", label: "Pengaturan",
-    desc: "Nama mempelai, tanggal nikah, target dana, harga emas manual, angka souvenir, dan reset data demo." },
+  { href: "/", label: "Ringkasan", short: "Ringkas" },
+  { href: "/uang", label: "Tabungan", short: "Tabungan" },
+  { href: "/biaya", label: "Biaya", short: "Biaya" },
+  { href: "/persiapan", label: "Persiapan", short: "Persiapan" },
+  { href: "/tamu", label: "Tamu & RSVP" },
+  { href: "/seserahan", label: "Seserahan" },
+  { href: "/vendor", label: "Vendor" },
+  { href: "/undangan", label: "Undangan & souvenir" },
+  { href: "/lagu", label: "Lagu" },
+  { href: "/pengaturan", label: "Pengaturan" },
 ];
 
 /** Menu Panduan: hanya untuk akun demo (lihat showGuide). */
-export const PANDUAN_NAV = { href: "/panduan", label: "Panduan", short: "Panduan",
-  desc: "Cara memakai tiap halaman, dengan langkah singkat yang bisa langsung dicoba." };
+export const PANDUAN_NAV = { href: "/panduan", label: "Panduan", short: "Panduan" };
 
 /** Menu untuk jenis akun ini: akun asli tidak pernah mendapat tautan Panduan. */
 export const navFor = (demo: boolean) => (demo ? [...NAV, PANDUAN_NAV] : NAV);
@@ -127,18 +116,5 @@ export function BottomNav({ demo = false }: { demo?: boolean }) {
         </ul>
       </nav>
     </>
-  );
-}
-
-/** Akun demo: satu kalimat tentang isi halaman ini, supaya penonton tahu fitur yang bisa dicoba. */
-export function DemoIntro() {
-  const path = usePathname();
-  const n = navFor(true).find((x) => isActive(path, x.href));
-  if (!n) return null;
-  return (
-    <aside aria-label="Tentang halaman ini" className="mb-6 border-l-2 border-emerald bg-sheet px-4 py-3">
-      <p className="eyebrow mb-1">Isi halaman {n.label}</p>
-      <p className="text-[14px] text-ink-2">{n.desc}</p>
-    </aside>
   );
 }

@@ -72,7 +72,7 @@ export default async function Uang() {
             <Ledger rows={[
               { label: `Setoran ${nm.CPP}`, value: rp(dana.cpp) },
               { label: `Setoran ${nm.CPW}`, value: rp(dana.cpw) },
-              { label: "Dipakai (gether)", value: `−${rp(dana.keluarPotong)}`, tone: "alert" },
+              { label: "Dipakai", value: `−${rp(dana.keluarPotong)}`, tone: "alert" },
               { label: "Terkumpul", value: rp(dana.terkumpul), strong: true },
               { label: "Kurang", value: rp(sisa), tone: "muted" },
             ]} />
@@ -132,7 +132,7 @@ export default async function Uang() {
         <p className="-mt-2 mb-4 text-[13.5px] text-ink-2">Dipotong dari dana bersama.</p>
         <EntityList profil={profil} rows={keluar.filter((k) => k.jenis === "gether") as never}
           config={{ table: "pengeluaran", noun: "pengeluaran", primary: "keterangan", secondary: ["tanggal"], amount: "jumlah",
-            defaults: { jenis: "gether", potong_dana: true }, hide: ["jenis"], csv: "outcome-gether", empty: "Belum ada pengeluaran." }} />
+            defaults: { jenis: "gether", potong_dana: true }, hide: ["jenis"], csv: "pengeluaran-bareng", empty: "Belum ada pengeluaran." }} />
       </Section>
 
       <Section title="Belanja seserahan" aside={<span className="num">{rp(dana.seserahan)}</span>}>

@@ -6,7 +6,7 @@ import { localMode } from "@/lib/env";
 import { daysBetween, todayJakarta } from "@/lib/calc";
 import { tglPanjang } from "@/lib/format";
 import { judulPasangan } from "@/lib/demo";
-import { BottomNav, DemoIntro, SideNav } from "@/components/nav";
+import { BottomNav, SideNav } from "@/components/nav";
 import { LoadError } from "@/components/load-error";
 import { signOut } from "../actions";
 
@@ -92,7 +92,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </p>
         )}
         <main className="px-4 pb-28 pt-5 md:px-0 md:pb-16 md:pt-8">
-          {demo && <DemoIntro />}
           {children}
         </main>
       </div>
