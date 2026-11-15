@@ -97,7 +97,7 @@ export function SavingsBar({ tersimpan, terpakai, pctTersimpan, pctTerpakai, tar
           </span>
         )}
         {terpakai > 0 && (
-          <span className="text-ink-3">= total disetor <span className="num">{rp(tersimpan + terpakai)}</span></span>
+          <span className="text-ink-3">= total ditabung <span className="num">{rp(tersimpan + terpakai)}</span></span>
         )}
       </p>
     </div>

@@ -43,7 +43,7 @@ export function SavingsChart({ titik, target, today, nikah }: Props) {
         <div className="relative">
           <p className="display text-[1.4rem]">Grafik saldo tabungan</p>
           <p className="mt-1 max-w-[22rem] text-[13.5px] text-ink-2">
-            Garis saldo dari waktu ke waktu, garis target, dan jalur sampai hari H muncul setelah setoran pertama dicatat.
+            Garis saldo dari waktu ke waktu, garis target, dan jalur sampai hari H muncul setelah tabungan pertama dicatat.
           </p>
         </div>
       </div>

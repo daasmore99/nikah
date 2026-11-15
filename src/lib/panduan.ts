@@ -47,13 +47,13 @@ export const PANDUAN: BagianPanduan[] = [
   {
     id: "tabungan", judul: "Tabungan", href: "/uang", halaman: "Tabungan",
     isi: [
-      "Setoran dicatat per pihak: CPP (calon pengantin pria) dan CPW (calon pengantin wanita).",
+      "Tabungan dicatat per pihak: CPP (calon pengantin pria) dan CPW (calon pengantin wanita).",
       "Pengeluaran bareng mengurangi dana terkumpul selama opsi Diambil dari dana bersama menyala; belanja seserahan punya bagian sendiri.",
-      "Kotak Supaya sampai target menghitung setoran per bulan sampai tanggal nikah, termasuk kalau dibagi dua.",
+      "Kotak Supaya sampai target menghitung tabungan per bulan sampai tanggal nikah, termasuk kalau dibagi dua.",
       "Bagian Emas menaksir nilai item Biaya yang diisi berat emas, memakai harga emas per gram.",
     ],
     coba: [
-      "Di bagian setoran pihak pria, tekan Tambah setoran.",
+      "Di bagian tabungan pihak pria, tekan Tambah tabungan.",
       "Isi jumlah 500000 dan tanggal hari ini, lalu Simpan.",
       "Lihat angka terkumpul dan persentase target di atas ikut naik.",
     ],
@@ -170,6 +170,6 @@ export const PANDUAN: BagianPanduan[] = [
 /** Tiga langkah pertama di kartu sambutan Ringkasan. */
 export const LANGKAH_AWAL = [
   { href: "/pengaturan", halaman: "Pengaturan", teks: "Isi nama & tanggal di Pengaturan" },
-  { href: "/uang", halaman: "Tabungan", teks: "Tambah satu setoran di Tabungan" },
+  { href: "/uang", halaman: "Tabungan", teks: "Tambah satu tabungan di halaman Tabungan" },
   { href: "/biaya", halaman: "Biaya", teks: "Coba Pilih beberapa di Biaya" },
 ] as const;

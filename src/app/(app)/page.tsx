@@ -91,10 +91,10 @@ export default async function Ringkasan() {
           </Reveal>
           {!adaTarget ? (
             <p className="mt-4 text-[14px] text-ink-2">
-              Isi target dana di <Link href="/pengaturan" className="link">Pengaturan</Link>, lalu catat setoran di <Link href="/uang" className="link">Tabungan</Link>.
+              Isi target dana di <Link href="/pengaturan" className="link">Pengaturan</Link>, lalu catat tabungan di <Link href="/uang" className="link">Tabungan</Link>.
             </p>
           ) : sisa > 0 && !tb ? (
-            <p className="mt-4 text-[14px] text-ink-2">Isi tanggal nikah untuk menghitung setoran per bulan.</p>
+            <p className="mt-4 text-[14px] text-ink-2">Isi tanggal nikah untuk menghitung tabungan per bulan.</p>
           ) : sisa > 0 && tb ? (
             <p className="mt-4 text-[15px]">
               Perlu <strong className="num font-medium text-emerald">{rp(tb.perBulan)}</strong> per bulan sampai {bulanAkhir}.

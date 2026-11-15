@@ -19,7 +19,7 @@ export default async function Pengaturan() {
   return (
     <div>
       <PageHead eyebrow="Pengaturan" title="Angka dasar">
-        Tanggal nikah dan target dana dipakai untuk hitung mundur dan target setoran bulanan.
+        Tanggal nikah dan target dana dipakai untuk hitung mundur dan target tabungan bulanan.
       </PageHead>
 
       <Section title="Acara & target">

@@ -32,7 +32,7 @@ export const FIELDS: Record<TableName, Field[]> = {
     { key: "jumlah", label: "Jumlah", type: "money", required: true },
     { key: "lokasi", label: "Disimpan di", type: "text", options: ["Rekening Bersama"], free: true },
     { key: "catatan", label: "Catatan", type: "text", wide: true },
-    { key: "saldo_awal", label: "Saldo awal (bukan setoran rutin)", type: "bool" },
+    { key: "saldo_awal", label: "Saldo awal (bukan tabungan rutin)", type: "bool" },
   ],
   pengeluaran: [
     { key: "jenis", label: "Jenis", type: "select", options: ["gether", "seserahan"], required: true },

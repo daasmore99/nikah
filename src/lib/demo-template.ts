@@ -60,9 +60,9 @@ const SESERAHAN: [kategori: string, nama: string[]][] = [
 export function demoTemplate(today: string): DemoTemplate {
   return {
     setoran: [
-      { pihak: "CPP", tanggal: mundur(today, 56), jumlah: 2_000_000, lokasi: "Rekening Bersama", catatan: "Contoh setoran", saldo_awal: false },
-      { pihak: "CPW", tanggal: mundur(today, 35), jumlah: 1_500_000, lokasi: "Rekening Bersama", catatan: "Contoh setoran", saldo_awal: false },
-      { pihak: "CPP", tanggal: mundur(today, 14), jumlah: 1_000_000, lokasi: "Rekening Bersama", catatan: "Contoh setoran", saldo_awal: false },
+      { pihak: "CPP", tanggal: mundur(today, 56), jumlah: 2_000_000, lokasi: "Rekening Bersama", catatan: "Contoh tabungan", saldo_awal: false },
+      { pihak: "CPW", tanggal: mundur(today, 35), jumlah: 1_500_000, lokasi: "Rekening Bersama", catatan: "Contoh tabungan", saldo_awal: false },
+      { pihak: "CPP", tanggal: mundur(today, 14), jumlah: 1_000_000, lokasi: "Rekening Bersama", catatan: "Contoh tabungan", saldo_awal: false },
     ],
     pengeluaran: [
       { jenis: "gether", tanggal: mundur(today, 7), jumlah: 250_000, keterangan: "Contoh: ongkos survei venue", potong_dana: true },

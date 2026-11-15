@@ -54,9 +54,9 @@ export default async function Uang() {
         <div>
           <p className="eyebrow mb-2">Supaya sampai target</p>
           {p.target_dana <= 0 ? (
-            <p className="text-[14px] text-ink-2">Isi target dana dan tanggal nikah di <a className="link" href="/pengaturan">Pengaturan</a> untuk melihat setoran per bulan.</p>
+            <p className="text-[14px] text-ink-2">Isi target dana dan tanggal nikah di <a className="link" href="/pengaturan">Pengaturan</a> untuk melihat tabungan per bulan.</p>
           ) : sisa > 0 && !tb ? (
-            <p className="text-[14px] text-ink-2">Isi tanggal nikah di <a className="link" href="/pengaturan">Pengaturan</a> untuk menghitung setoran per bulan.</p>
+            <p className="text-[14px] text-ink-2">Isi tanggal nikah di <a className="link" href="/pengaturan">Pengaturan</a> untuk menghitung tabungan per bulan.</p>
           ) : sisa > 0 && tb ? (
             <>
               <p className="num text-[2rem] leading-none text-emerald">{rp(tb.perBulan)}</p>
@@ -70,8 +70,8 @@ export default async function Uang() {
           )}
           <div className="mt-5">
             <Ledger rows={[
-              { label: `Setoran ${nm.CPP}`, value: rp(dana.cpp) },
-              { label: `Setoran ${nm.CPW}`, value: rp(dana.cpw) },
+              { label: `Tabungan ${nm.CPP}`, value: rp(dana.cpp) },
+              { label: `Tabungan ${nm.CPW}`, value: rp(dana.cpw) },
               { label: "Dipakai", value: `−${rp(dana.keluarPotong)}`, tone: "alert" },
               { label: "Terkumpul", value: rp(dana.terkumpul), strong: true },
               { label: "Kurang", value: rp(sisa), tone: "muted" },
@@ -116,16 +116,16 @@ export default async function Uang() {
         </div>
       </Section>
 
-      <Section title={`Setoran ${nm.CPP}`} aside={<span className="num">{rp(dana.cpp)}</span>}>
+      <Section title={`Tabungan ${nm.CPP}`} aside={<span className="num">{rp(dana.cpp)}</span>}>
         <EntityList profil={profil} rows={setoran.filter((s) => s.pihak === "CPP") as never}
-          config={{ table: "setoran", noun: "setoran", primary: "tanggal", primaryFallback: "catatan", secondary: ["lokasi", "catatan"], amount: "jumlah",
-            defaults: { pihak: "CPP", lokasi: "Rekening Bersama" }, hide: ["pihak"], csv: "setoran-cpp", empty: "Belum ada setoran." }} />
+          config={{ table: "setoran", noun: "tabungan", primary: "tanggal", primaryFallback: "catatan", secondary: ["lokasi", "catatan"], amount: "jumlah",
+            defaults: { pihak: "CPP", lokasi: "Rekening Bersama" }, hide: ["pihak"], csv: "tabungan-cpp", empty: "Belum ada tabungan." }} />
       </Section>
 
-      <Section title={`Setoran ${nm.CPW}`} aside={<span className="num">{rp(dana.cpw)}</span>}>
+      <Section title={`Tabungan ${nm.CPW}`} aside={<span className="num">{rp(dana.cpw)}</span>}>
         <EntityList profil={profil} rows={setoran.filter((s) => s.pihak === "CPW") as never}
-          config={{ table: "setoran", noun: "setoran", primary: "tanggal", primaryFallback: "catatan", secondary: ["lokasi", "catatan"], amount: "jumlah",
-            defaults: { pihak: "CPW", lokasi: "Rekening Bersama" }, hide: ["pihak"], csv: "setoran-cpw", empty: "Belum ada setoran." }} />
+          config={{ table: "setoran", noun: "tabungan", primary: "tanggal", primaryFallback: "catatan", secondary: ["lokasi", "catatan"], amount: "jumlah",
+            defaults: { pihak: "CPW", lokasi: "Rekening Bersama" }, hide: ["pihak"], csv: "tabungan-cpw", empty: "Belum ada tabungan." }} />
       </Section>
 
       <Section title="Pengeluaran bareng" aside={<span className="num">{rp(dana.gether)}</span>}>
