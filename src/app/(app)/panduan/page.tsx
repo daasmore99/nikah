@@ -17,6 +17,7 @@ export default async function Panduan() {
     <div>
       <PageHead eyebrow="Panduan" title="Cara memakai tracker ini">
         Buka bagian yang ingin dipelajari. Tiap bagian punya langkah singkat yang bisa langsung dicoba di akun ini.
+        Isi awal di setiap menu hanya contoh, boleh diubah atau dihapus. Isian tersimpan di browser ini saja; kalau cookie dihapus, ruangnya baru.
       </PageHead>
       <ol className="border-t border-line">
         {PANDUAN.map((b, i) => (

@@ -41,7 +41,7 @@ export default async function Pengaturan() {
       {repo.mode === "demo" && (
         <Section title="Data demo" id="reset-demo">
           <p className="-mt-1 mb-4 max-w-[38rem] text-[14px] text-ink-2">
-            Isi apa saja untuk mencoba fitur, lalu kosongkan lagi di sini.
+            Isian demo tersimpan untuk browser ini saja (menghapus cookie = ruang baru). Isi apa saja untuk mencoba fitur, lalu kembalikan ke contoh awal di sini.
           </p>
           <ResetDemo />
         </Section>

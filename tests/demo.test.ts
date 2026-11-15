@@ -11,6 +11,8 @@ import { DATA_TABLES, DEMO_BELUM_SIAP, emptyPengaturan, isMissingRelation, judul
 import { localRepo } from "../src/lib/local-store";
 import { TABLE_NAMES } from "../src/lib/types";
 
+const WS_A = "0b8f3a52-6c1d-4e2f-9a7b-1c2d3e4f5a6b";
+
 test("resolveStore: anggota -> asli, penonton -> demo, tak dikenal -> ditolak", () => {
   assert.equal(resolveStore({ anggota: true, penonton: false }), "asli");
   assert.equal(resolveStore({ anggota: false, penonton: true }), "demo");
@@ -64,7 +66,8 @@ test("isMissingRelation: tabel/fungsi belum ada dikenali, error lain tidak", () 
 
 test("file per penyimpanan", () => {
   assert.equal(localFileFor("asli"), "db.json");
-  assert.equal(localFileFor("demo"), "demo.json");
+  assert.equal(localFileFor("demo", WS_A), `demo-${WS_A}.json`);
+  assert.throws(() => localFileFor("demo"));
 });
 
 test("LOCAL_DEMO hanya aktif di mode lokal; LOCAL_VIEWER alias", () => {
@@ -98,12 +101,14 @@ function sandbox() {
   return { root, dbPath, before: readFileSync(dbPath, "utf8") };
 }
 
-test("repo demo lokal: mulai kosong, tulis berfungsi, db.json asli tidak tersentuh", async () => {
+test("repo demo lokal: mulai dari contoh, tulis berfungsi, db.json asli tidak tersentuh", async () => {
   const { root, dbPath, before } = sandbox();
   try {
-    const repo = localRepo({ root, mode: "demo" });
+    const repo = localRepo({ root, mode: "demo", ws: WS_A });
     assert.equal(repo.mode, "demo");
-    for (const t of TABLE_NAMES) assert.deepEqual(await repo.list(t), [], `${t} harus kosong`);
+    // isi awal = kerangka contoh, bukan data asli
+    assert.ok(!(await repo.list("tamu")).some((r) => r.nama === "Tamu Asli"));
+    await repo.removeMany("tamu", (await repo.list("tamu")).map((r) => r.id));
     const p = await repo.pengaturan();
     assert.equal(p.nama_pria, "");
     assert.equal(p.tanggal_nikah, null);
@@ -127,10 +132,10 @@ test("repo demo lokal: mulai kosong, tulis berfungsi, db.json asli tidak tersent
     await assert.rejects(repo.update("tamu", "11111111-1111-1111-1111-111111111111", { nama: "x" }));
 
     assert.equal(readFileSync(dbPath, "utf8"), before, "db.json asli berubah");
-    assert.ok(existsSync(join(root, ".local-data", "demo.json")));
+    assert.ok(existsSync(join(root, ".local-data", `demo-${WS_A}.json`)));
 
     await repo.resetDemo();
-    assert.deepEqual(await repo.list("tamu"), []);
+    assert.deepEqual((await repo.list("tamu")).map((r) => r.nama), ["Tamu contoh 1", "Tamu contoh 2", "Tamu contoh 3"]);
     assert.equal((await repo.pengaturan()).nama_pria, "");
     assert.equal(readFileSync(dbPath, "utf8"), before, "db.json asli berubah setelah reset");
   } finally {
@@ -163,7 +168,7 @@ test("repo Supabase: semua tabel data lewat tableFor(mode, ...), tanpa skema dem
   // rpc hanya fungsi identifikasi + reset_demo (yang sendiri mengecek is_penonton)
   assert.deepEqual([...src.matchAll(/\.rpc\("([^"]+)"\)/g)].map((m) => m[1]).sort(), ["is_anggota", "is_penonton", "reset_demo"]);
   // tabel demo belum ada -> pesan jelas untuk akun demo, bukan jatuh ke tabel asli
-  assert.match(src, /mode === "demo" && isMissingRelation\(e\)\) throw new RepoError\(DEMO_BELUM_SIAP\)/);
+  assert.match(src, /mode === "demo" && isDemoSchemaOld\(e\)\) throw new RepoError\(DEMO_BELUM_SIAP\)/);
 });
 
 test("tidak ada kode yang memakai skema demo lama", () => {

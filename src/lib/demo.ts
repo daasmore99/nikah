@@ -36,7 +36,7 @@ export function tableFor<T extends DataTable>(mode: StoreMode, table: T): T | `d
 
 /** Pesan untuk akun demo kalau tabel demo_* belum dibuat (migrasi demo_public belum dijalankan). */
 export const DEMO_BELUM_SIAP =
-  "Penyimpanan demo belum disiapkan. Jalankan migrasi supabase/migrations/20261115010000_demo_public.sql (3 bagian) di SQL Editor Supabase.";
+  "Penyimpanan demo belum disiapkan. Jalankan migrasi supabase/migrations/20261115010000_demo_public.sql lalu 20261116000000_demo_workspace.sql (masing-masing 3 bagian) di SQL Editor Supabase.";
 
 /**
  * Error PostgREST/Postgres yang berarti tabel atau fungsi belum ada:
@@ -51,8 +51,80 @@ export function isMissingRelation(e: { code?: string | null; message?: string | 
 /** Panduan pemakaian (/panduan, kartu sambutan) hanya untuk akun demo. */
 export const showGuide = (mode: StoreMode) => mode === "demo";
 
-/** File mode lokal untuk tiap penyimpanan. */
-export const localFileFor = (mode: StoreMode) => (mode === "demo" ? "demo.json" : "db.json");
+/* ---------------- ruang demo per pengunjung (workspace) ---------------- */
+
+/**
+ * Tiap browser yang memakai akun demo punya ruang data sendiri: uuid v4 acak di cookie httpOnly
+ * `demo_ws`. Di Supabase uuid ini dikirim sebagai header `x-demo-ws`; RLS hanya membuka baris
+ * dengan ws = header (isolasi berbasis kapabilitas: cukup untuk data demo, bukan untuk rahasia).
+ * Akun asli tidak pernah mendapat cookie ini dan tidak pernah mengirim header ini.
+ */
+export const DEMO_WS_COOKIE = "demo_ws";
+export const DEMO_WS_HEADER = "x-demo-ws";
+const WS_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** uuid v4 huruf kecil, persis 36 karakter: satu-satunya bentuk ws yang diterima (juga mencegah path traversal). */
+export function isDemoWs(v: unknown): v is string {
+  return typeof v === "string" && WS_RE.test(v);
+}
+
+export function newDemoWs(): string {
+  return globalThis.crypto.randomUUID();
+}
+
+export const DEMO_WS_MAX_AGE = 60 * 60 * 24 * 30; // 30 hari
+
+export function demoWsCookieOptions(production: boolean) {
+  return { httpOnly: true, secure: production, sameSite: "lax" as const, path: "/", maxAge: DEMO_WS_MAX_AGE };
+}
+
+/**
+ * Apa yang dilakukan proxy terhadap cookie demo_ws.
+ * demo + cookie valid -> keep; demo + tidak ada/rusak -> set (uuid baru);
+ * bukan demo + ada cookie -> delete; bukan demo tanpa cookie -> none.
+ */
+export function wsCookieAction(demo: boolean, current: string | undefined): "keep" | "set" | "delete" | "none" {
+  if (demo) return isDemoWs(current) ? "keep" : "set";
+  return current === undefined ? "none" : "delete";
+}
+
+/** Header tambahan untuk klien Supabase: hanya mode demo dengan ws valid. Akun asli: selalu kosong. */
+export function demoHeaders(mode: StoreMode, ws: string | null | undefined): Record<string, string> {
+  if (mode !== "demo") return {};
+  if (!isDemoWs(ws)) throw new Error("Ruang demo tidak valid");
+  return { [DEMO_WS_HEADER]: ws };
+}
+
+/** Pesan kalau request demo tidak membawa cookie ruang (mis. sebelum proxy sempat memasangnya). */
+export const DEMO_WS_HILANG = "Ruang demo untuk browser ini belum siap. Muat ulang halaman (atau keluar lalu masuk lagi).";
+
+/** Batas baris per tabel per ruang (sama dengan trigger demo_batas_ws di migrasi). */
+export const DEMO_BATAS_BARIS = 500;
+
+/** Pesan ramah untuk batas ukuran data demo (trigger demo_batas_ws, errcode 54000). */
+export const DEMO_BATAS =
+  "Batas data demo tercapai (maksimal 500 baris per tabel). Hapus sebagian data atau pakai Reset data demo di Pengaturan.";
+
+export function isDemoLimit(e: { code?: string | null; message?: string | null } | null | undefined) {
+  if (!e) return false;
+  return e.code === "54000" || /Batas data demo tercapai/.test(e.message ?? "");
+}
+
+/** Kolom ws / PK pengaturan per ruang belum ada = migrasi demo_workspace belum dijalankan. */
+export function isDemoSchemaOld(e: { code?: string | null; message?: string | null } | null | undefined) {
+  if (!e) return false;
+  return isMissingRelation(e) || e.code === "42703" || e.code === "42P10" || e.code === "PGRST204";
+}
+
+/**
+ * File mode lokal untuk tiap penyimpanan. Demo: satu file per ruang, `demo-<uuid>.json`.
+ * ws divalidasi ketat (uuid v4) supaya tidak pernah bisa keluar dari .local-data.
+ */
+export function localFileFor(mode: StoreMode, ws?: string | null): string {
+  if (mode !== "demo") return "db.json";
+  if (!isDemoWs(ws)) throw new Error("Ruang demo tidak valid");
+  return `demo-${ws}.json`;
+}
 
 /** Mode lokal demo: LOCAL_DEMO=1 (atau alias lama LOCAL_VIEWER=1), hanya kalau mode lokal aktif. */
 export function localDemoFlag(env: Record<string, string | undefined>, localMode: boolean) {

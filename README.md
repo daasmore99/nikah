@@ -14,7 +14,8 @@ src/app/login/        halaman masuk (email + kata sandi)
 src/app/actions.ts    server actions: tambah/ubah/hapus + validasi + login/keluar
 src/proxy.ts          refresh sesi Supabase, arahkan tamu ke /login
 src/lib/repo.ts       akses data (Supabase, atau file lokal untuk mencoba); akun demo -> tabel public.demo_*
-src/lib/demo.ts       aturan akun demo (anggota -> data asli, penonton -> demo) + tableFor()
+src/lib/demo.ts       aturan akun demo (anggota -> data asli, penonton -> demo) + tableFor() + ruang per browser
+src/lib/demo-template.ts  kerangka contoh awal tiap menu untuk ruang demo baru
 src/lib/fields.ts     definisi kolom tiap tabel (form + validasi server)
 src/lib/calc.ts       hitungan: dana terkumpul, target bulanan, biaya, countdown
 src/lib/gold.ts       harga emas otomatis + cadangan
@@ -23,6 +24,7 @@ scripts/import-sheet.ts  impor sheet -> data/import.json + supabase/seed.local.s
 supabase/migrations/  skema SQL + RLS
 tests/import.test.ts  tes impor: angka hasil impor vs total di sheet
 tests/demo.test.ts    tes akun demo: penyimpanan per jenis akun, data asli tidak tersentuh
+tests/demo-ws.test.ts tes ruang demo per browser: isolasi dua ruang, cookie/header, template, migrasi
 ```
 
 `data/`, `.local-data/`, `supabase/seed.local.sql` dan `.env*` ada di `.gitignore` karena berisi data pribadi.
@@ -41,7 +43,8 @@ Mode lokal tidak pakai login dan menyimpan perubahan di `.local-data/db.json`. H
 Mode ini mati otomatis di production dan kalau env Supabase terisi.
 
 Coba sebagai akun demo di laptop: tambahkan `LOCAL_DEMO=1` di `.env.local` (di samping `LOCAL_MODE=1`), restart `npm run dev`.
-Data demo disimpan di `.local-data/demo.json` yang mulai kosong; `db.json` tidak dibaca dan tidak diubah.
+Tiap browser mendapat ruang sendiri (cookie `demo_ws`), disimpan di `.local-data/demo-<uuid>.json` yang mulai
+berisi contoh awal; `db.json` tidak dibaca dan tidak diubah. Hapus cookie / buka jendela privat = ruang baru.
 
 Cek semuanya sekaligus: `npm run check` (typecheck, lint, tes impor + tes demo, build).
 
@@ -71,8 +74,15 @@ Kolom `created_by` / `updated_by` terisi otomatis dari akun yang menginput.
 ### 1b. Akun demo (opsional)
 
 Akun ketiga untuk melihat-lihat dan mencoba semua fitur. Bisa tambah/ubah/hapus, tapi datanya di tabel
-terpisah berawalan `demo_` (`public.demo_tamu`, `public.demo_pengaturan`, dst.) yang mulai kosong (tanpa nama
-mempelai, tanggal, atau angka). RLS: tabel `demo_*` hanya terbuka untuk email di `penonton`, tabel asli hanya
+terpisah berawalan `demo_` (`public.demo_tamu`, `public.demo_pengaturan`, dst.).
+
+**Satu kredensial bersama, ruang data per browser.** Banyak orang boleh masuk dengan email demo yang sama;
+tiap browser mendapat uuid acak di cookie httpOnly `demo_ws` (30 hari) yang dikirim ke database sebagai header
+`x-demo-ws`. Setiap baris `demo_*` punya kolom `ws`, dan RLS hanya membuka baris ruang browser itu, jadi isian
+pengunjung A tidak terlihat oleh pengunjung B dan sebaliknya. Cookie dihapus / jendela privat / browser lain =
+ruang baru. Ruang baru langsung berisi kerangka contoh (kategori, tahap, beberapa item generik) dengan
+Pengaturan kosong (tanpa nama mempelai, tanggal, atau target). Ini isolasi berbasis kapabilitas (siapa pun yang
+tahu uuid-nya bisa membuka ruang itu): cukup untuk data coba-coba, jangan dipakai untuk menyimpan rahasia. RLS: tabel `demo_*` hanya terbuka untuk email di `penonton`, tabel asli hanya
 untuk email di `anggota`. Akun demo tidak pernah membaca atau menulis data asli, dan foto `public/foto-kami.jpg`
 tidak ditampilkan untuknya. Tidak perlu membuka skema tambahan di Data API (`demo_*` ada di skema `public`).
 
@@ -83,6 +93,12 @@ tidak ditampilkan untuknya. Tidak perlu membuka skema tambahan di Data API (`dem
    - BAGIAN 3: fungsi `reset_demo()`
 
    Batas tiap bagian ditandai `-- ===== BAGIAN n =====` di file. Kalau file utuh bisa ditempel sekaligus, itu juga boleh.
+
+   Lalu jalankan `supabase/migrations/20261116000000_demo_workspace.sql` (ruang per browser), juga 3 bagian berurutan:
+   - BAGIAN 1: fungsi `demo_ws()`, kolom `ws` + index di 12 tabel `demo_*`, pengaturan demo satu baris per ruang.
+     **Mengosongkan semua isi `demo_*` sekali** (data demo sekali pakai; tabel asli tidak disentuh).
+   - BAGIAN 2: policy `penonton_*` per ruang + batas 500 baris per tabel per ruang
+   - BAGIAN 3: `reset_demo()` hanya untuk ruang sendiri + pembersih `purge_demo()`
 2. Daftarkan email demo (SQL Editor). **Jangan** masukkan email ini ke `anggota`:
    ```sql
    insert into public.penonton (email) values ('email-demo@contoh.com') on conflict do nothing;
@@ -96,8 +112,14 @@ Catatan: skema `demo` dari `20261115000000_demo.sql` versi lama **tidak dipakai 
 yang tidak tersedia). Tabel `penonton` dan `is_penonton()` dari file itu tetap dipakai. Skema lama boleh dihapus
 manual kapan saja: `drop schema if exists demo cascade;` (migrasi tidak menghapusnya otomatis).
 
-Isi demo bisa dikosongkan lagi di **Pengaturan → Data demo → Reset data demo** (konfirmasi dua langkah).
-Semua akun di `penonton` berbagi satu data demo yang sama.
+Isi ruang demo bisa dikembalikan ke contoh awal di **Pengaturan → Data demo → Reset data demo** (konfirmasi dua
+langkah); hanya ruang browser itu yang terhapus. Tiap tabel dibatasi 500 baris per ruang (pesan "Batas data demo
+tercapai").
+
+Ruang yang lama tidak dipakai menumpuk di database. Bersihkan manual di SQL Editor (hanya bisa dari sana,
+tidak lewat API): `select public.purge_demo();` menghapus ruang yang tidak diubah 30 hari (atau
+`select public.purge_demo('7 days');`). Opsional, kalau extension `pg_cron` aktif, jadwalkan harian:
+`select cron.schedule('purge-demo', '17 3 * * *', $c$select public.purge_demo()$c$);`
 
 ### 2. Vercel
 

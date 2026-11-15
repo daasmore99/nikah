@@ -88,7 +88,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         {localMode && (
           <p className="border-b border-brass/40 bg-brass-tint px-4 py-2 text-[12.5px] text-ink-2 md:mt-4 md:border">
-            Mode lokal: data disimpan di <code>.local-data/{demo ? "demo.json" : "db.json"}</code> di laptop ini, tanpa login. Hanya untuk mencoba.
+            Mode lokal: data disimpan di <code>.local-data/{demo ? "demo-<ruang>.json" : "db.json"}</code> di laptop ini, tanpa login. Hanya untuk mencoba.
           </p>
         )}
         <main className="px-4 pb-28 pt-5 md:px-0 md:pb-16 md:pt-8">

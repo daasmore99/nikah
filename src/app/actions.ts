@@ -6,6 +6,7 @@ import { FIELDS, PENGATURAN_FIELDS } from "@/lib/fields";
 import { requireRepo, RepoError } from "@/lib/repo";
 import { supabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { syncDemoWsCookie } from "@/lib/demo-ws";
 import { TABLE_NAMES, type TableName } from "@/lib/types";
 import { validate, type Values } from "@/lib/validate";
 import { MAX_CREATE, MAX_IDS, type RowChange } from "@/lib/bulk";
@@ -165,7 +166,7 @@ export async function updatePengaturan(input: Values): Promise<ActionResult> {
   });
 }
 
-/** Kosongkan semua data akun demo. Ditolak untuk akun data asli (dicek lagi di repo dan di database). */
+/** Kembalikan ruang demo browser ini ke kerangka contoh awal. Ditolak untuk akun data asli (dicek lagi di repo dan di database). */
 export async function resetDemo(konfirmasi: string): Promise<ActionResult> {
   if (konfirmasi !== "RESET") return { ok: false, message: "Konfirmasi tidak cocok." };
   return run(async () => {
@@ -185,6 +186,9 @@ export async function signIn(_: unknown, form: FormData): Promise<{ message: str
   const sb = await createClient();
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) return { message: "Email atau kata sandi salah." };
+  // akun demo: pastikan browser ini punya ruang demo (cookie demo_ws); akun asli: buang cookie demo
+  const { data: penonton } = await sb.rpc("is_penonton");
+  await syncDemoWsCookie(penonton === true);
   redirect("/");
 }
 

@@ -5,7 +5,10 @@ import { connection } from "next/server";
 import { localDemo, localMode, supabaseConfigured } from "./env";
 import { createClient } from "./supabase/server";
 import { groupSameValues } from "./bulk";
-import { DEMO_BELUM_SIAP, isMissingRelation, resolveStore, tableFor } from "./demo";
+import { DEMO_BATAS, DEMO_BELUM_SIAP, demoHeaders, isDemoLimit, isDemoSchemaOld, resolveStore, tableFor } from "./demo";
+import { demoTemplateRows } from "./demo-template";
+import { demoWs } from "./demo-ws";
+import { todayJakarta } from "./calc";
 import { localRepo } from "./local-store";
 import { RepoError, type BatchOutcome, type Repo, type StoreMode } from "./repo-types";
 import type { Pengaturan } from "./types";
@@ -35,42 +38,46 @@ async function supabaseRepo(): Promise<Repo | null> {
   const access = await storeOf(sb);
   if (access === "ditolak") throw new RepoError("Akun ini belum terdaftar di tabel anggota atau penonton, atau migrasi belum dijalankan.");
   const mode: StoreMode = access;
+  // Akun demo: klien BARU (per request) yang mengirim header x-demo-ws = ruang browser ini (cookie demo_ws).
+  // RLS demo_* hanya membuka baris ruang itu. Akun asli memakai klien biasa, tanpa header & tanpa cookie demo.
+  const db = mode === "demo" ? await createClient(demoHeaders(mode, await demoWs())) : sb;
   // SEMUA akses tabel data lewat tableFor(mode, ...): akun demo hanya pernah menyentuh public.demo_*.
   // Tidak ada fallback ke tabel asli: kalau demo_* belum ada, akun demo mendapat error yang jelas.
   const fail = (op: string, e: { code?: string; message: string } | null) => {
     if (!e) return;
-    if (mode === "demo" && isMissingRelation(e)) throw new RepoError(DEMO_BELUM_SIAP);
+    if (mode === "demo" && isDemoLimit(e)) throw new RepoError(DEMO_BATAS);
+    if (mode === "demo" && isDemoSchemaOld(e)) throw new RepoError(DEMO_BELUM_SIAP);
     throw new RepoError(`${op} gagal: ${e.message}`);
   };
   const repo: Repo = {
     user: { id: claims.sub, email, nama: email.split("@")[0] },
     mode,
     async list(table) {
-      const { data, error } = await sb.from(tableFor(mode, table)).select("*").order("urutan").order("created_at");
+      const { data, error } = await db.from(tableFor(mode, table)).select("*").order("urutan").order("created_at");
       fail("Memuat data", error);
       return (data ?? []) as never;
     },
     async insert(table, values) {
-      const { error } = await sb.from(tableFor(mode, table)).insert(values);
+      const { error } = await db.from(tableFor(mode, table)).insert(values);
       fail("Menyimpan", error);
     },
     async update(table, id, values) {
-      const { error, count } = await sb.from(tableFor(mode, table)).update(values, { count: "exact" }).eq("id", id);
+      const { error, count } = await db.from(tableFor(mode, table)).update(values, { count: "exact" }).eq("id", id);
       fail("Mengubah", error);
       if (count === 0) throw new RepoError("Data tidak ditemukan atau tidak ada akses");
     },
     async remove(table, id) {
-      const { error } = await sb.from(tableFor(mode, table)).delete().eq("id", id);
+      const { error } = await db.from(tableFor(mode, table)).delete().eq("id", id);
       fail("Menghapus", error);
     },
     async insertMany(table, rows) {
-      const { error } = await sb.from(tableFor(mode, table)).insert(rows);
+      const { error } = await db.from(tableFor(mode, table)).insert(rows);
       fail("Menyimpan", error);
     },
     async updateMany(table, changes) {
       const out: BatchOutcome = { done: [], failed: [] };
       for (const g of groupSameValues(changes)) {
-        const { data, error } = await sb.from(tableFor(mode, table)).update(g.values).in("id", g.ids).select("id");
+        const { data, error } = await db.from(tableFor(mode, table)).update(g.values).in("id", g.ids).select("id");
         if (error) {
           for (const id of g.ids) out.failed.push({ id, message: `Mengubah gagal: ${error.message}` });
           continue;
@@ -84,19 +91,19 @@ async function supabaseRepo(): Promise<Repo | null> {
       return out;
     },
     async removeMany(table, ids) {
-      const { error, count } = await sb.from(tableFor(mode, table)).delete({ count: "exact" }).in("id", ids);
+      const { error, count } = await db.from(tableFor(mode, table)).delete({ count: "exact" }).in("id", ids);
       fail("Menghapus", error);
       return count ?? ids.length;
     },
     async pengaturan() {
-      const { data, error } = await sb.from(tableFor(mode, "pengaturan")).select("*").eq("id", 1).maybeSingle();
+      const { data, error } = await db.from(tableFor(mode, "pengaturan")).select("*").eq("id", 1).maybeSingle();
       fail("Memuat pengaturan", error);
       if (!data)
         throw new RepoError(mode === "demo" ? DEMO_BELUM_SIAP : "Akun ini belum terdaftar di tabel anggota, atau migrasi belum dijalankan.");
       return data as Pengaturan;
     },
     async updatePengaturan(values) {
-      const { error } = await sb.from(tableFor(mode, "pengaturan")).update(values).eq("id", 1);
+      const { error } = await db.from(tableFor(mode, "pengaturan")).update(values).eq("id", 1);
       fail("Menyimpan pengaturan", error);
     },
     async profil() {
@@ -110,10 +117,43 @@ async function supabaseRepo(): Promise<Repo | null> {
     },
     async resetDemo() {
       if (mode !== "demo") throw new RepoError("Reset hanya untuk akun demo.");
-      const { error } = await sb.rpc("reset_demo");
+      // reset_demo hanya menghapus ruang pemanggil (ws dari header), lalu isi lagi kerangka contoh
+      const { error } = await db.rpc("reset_demo");
       fail("Reset demo", error);
+      await isiContoh();
     },
   };
+
+  /** Kerangka contoh lewat jalur repo yang sama (insertMany). Gagal = dicatat, ruang tetap bisa dipakai. */
+  async function isiContoh() {
+    for (const { table, rows } of demoTemplateRows(todayJakarta())) {
+      try {
+        await repo.insertMany(table, rows);
+      } catch (e) {
+        console.error("[demo] isi contoh gagal", table, e instanceof Error ? e.message : e);
+      }
+    }
+  }
+
+  /**
+   * Ruang demo baru: buat baris pengaturan kosong untuk ws ini (insert ... on conflict (ws) do nothing).
+   * Hanya request yang BENAR-BENAR menyisipkan baris itu yang mengisi kerangka contoh, jadi dua request
+   * bersamaan tidak menggandakan isi. Dijalankan sekali per request (requireRepo di-cache), sebelum
+   * halaman membaca daftar apa pun.
+   */
+  async function siapkanRuang() {
+    const ada = await db.from(tableFor(mode, "pengaturan")).select("id").limit(1);
+    fail("Memuat pengaturan", ada.error);
+    if (ada.data?.length) return;
+    const baru = await db
+      .from(tableFor(mode, "pengaturan"))
+      .upsert({ nama_pria: "", nama_wanita: "", tanggal_nikah: null, target_dana: 0 }, { onConflict: "ws", ignoreDuplicates: true })
+      .select("id");
+    fail("Menyiapkan ruang demo", baru.error);
+    if (baru.data?.length) await isiContoh();
+  }
+
+  if (mode === "demo") await siapkanRuang();
   await repo.profil();
   return repo;
 }
@@ -128,6 +168,6 @@ export const requireRepo = cache(async (): Promise<Repo> => {
     if (!repo) redirect("/login");
     return repo;
   }
-  if (localMode) return localRepo({ mode: localDemo ? "demo" : "asli" });
+  if (localMode) return localDemo ? localRepo({ mode: "demo", ws: await demoWs() }) : localRepo({ mode: "asli" });
   redirect("/setup");
 });

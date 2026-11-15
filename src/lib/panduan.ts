@@ -157,12 +157,12 @@ export const PANDUAN: BagianPanduan[] = [
   {
     id: "reset", judul: "Reset data demo", href: "/pengaturan#reset-demo", halaman: "Pengaturan",
     isi: [
-      "Untuk mulai dari kosong lagi, buka Pengaturan bagian Data demo: semua daftar dan isian Pengaturan dikosongkan.",
+      "Untuk mulai lagi, buka Pengaturan bagian Data demo: semua isian dihapus dan setiap menu diisi lagi dengan contoh awal.",
       "Reset tidak bisa dibatalkan, jadi ada konfirmasi dengan mengetik RESET.",
     ],
     coba: [
       "Buka Pengaturan, tekan Reset data demo.",
-      "Ketik RESET, lalu tekan Ya, kosongkan data demo.",
+      "Ketik RESET, lalu tekan Ya, kembalikan ke contoh awal.",
     ],
   },
 ];
